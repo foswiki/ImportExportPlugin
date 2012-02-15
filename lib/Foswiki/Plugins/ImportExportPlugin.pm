@@ -4,60 +4,6 @@
 
 ---+ package Foswiki::Plugins::ImportExportPlugin
 
-Foswiki plugins 'listen' to events happening in the core by registering an
-interest in those events. They do this by declaring 'plugin handlers'. These
-are simply functions with a particular name that, if they exist in your
-plugin, will be called by the core.
-
-This is an empty Foswiki plugin. It is a fully defined plugin, but is
-disabled by default in a Foswiki installation. Use it as a template
-for your own plugins.
-
-To interact with Foswiki use ONLY the official APIs
-documented in %SYSTEMWEB%.DevelopingPlugins. <strong>Do not reference any
-packages, functions or variables elsewhere in Foswiki</strong>, as these are
-subject to change without prior warning, and your plugin may suddenly stop
-working.
-
-Error messages can be output using the =Foswiki::Func= =writeWarning= and
-=writeDebug= functions. These logs can be found in the Foswiki/working/logs
-directory.  You can also =print STDERR=; the output will appear in the
-webserver error log.  The {WarningsAreErrors} configure setting makes
-Foswiki less tolerant of errors, and it is recommended to set it during
-development.  It can be set using configure, in the 'Miscellaneous'
-section.  Most handlers can also throw exceptions (e.g.
-[[%SCRIPTURL{view}%/%SYSTEMWEB%/PerlDoc?module=Foswiki::OopsException][Foswiki::OopsException]])
-
-For increased performance, all handler functions except =initPlugin= are
-commented out below. *To enable a handler* remove the leading =#= from
-each line of the function. For efficiency and clarity, you should
-only uncomment handlers you actually use.
-
-__NOTE:__ When developing a plugin it is important to remember that
-Foswiki is tolerant of plugins that do not compile. In this case,
-the failure will be silent but the plugin will not be available.
-See %SYSTEMWEB%.InstalledPlugins for error messages.
-
-__NOTE:__ Foswiki:Development.StepByStepRenderingOrder helps you decide which
-rendering handler to use. When writing handlers, keep in mind that these may
-be invoked on included topics. For example, if a plugin generates links to the
-current topic, these need to be generated before the =afterCommonTagsHandler=
-is run. After that point in the rendering loop we have lost the information
-that the text had been included from another topic.
-
-__NOTE:__ Not all handlers (and not all parameters passed to handlers) are
-available with all versions of Foswiki. Where a handler has been added
-the POD comment will indicate this with a "Since" line
-e.g. *Since:* Foswiki::Plugins::VERSION 1.1
-
-Deprecated handlers are still available, and can continue to be used to
-maintain compatibility with earlier releases, but will be removed at some
-point in the future. If you do implement deprecated handlers, then you can
-do no harm by simply keeping them in your code, but you are recommended to
-implement the alternative as soon as possible.
-
-See http://foswiki.org/Download/ReleaseDates for a breakdown of release
-versions.
 
 =cut
 
@@ -87,22 +33,7 @@ our $VERSION = '$Rev$';
 # Note: it's important that this string is exactly the same in the extension
 # topic - if you use %$RELEASE% with BuildContrib this is done automatically.
 our $RELEASE = '1.0.0';
-
-# Short description of this plugin
-# One line description, is shown in the %SYSTEMWEB%.TextFormattingRules topic:
 our $SHORTDESCRIPTION = 'Import and export wiki data';
-
-# You must set $NO_PREFS_IN_TOPIC to 0 if you want your plugin to use
-# preferences set in the plugin topic. This is required for compatibility
-# with older plugins, but imposes a significant performance penalty, and
-# is not recommended. Instead, leave $NO_PREFS_IN_TOPIC at 1 and use
-# =$Foswiki::cfg= entries, or if you want the users
-# to be able to change settings, then use standard Foswiki preferences that
-# can be defined in your %USERSWEB%.SitePreferences and overridden at the web
-# and topic level.
-#
-# %SYSTEMWEB%.DevelopingPlugins has details of how to define =$Foswiki::cfg=
-# entries so they can be used with =configure=.
 our $NO_PREFS_IN_TOPIC = 1;
 
 =begin TML
@@ -162,6 +93,7 @@ sub initPlugin {
     # Allow a sub to be called from the REST interface
     # using the provided alias
     Foswiki::Func::registerRESTHandler( 'import', \&doImport );
+    #Foswiki::Func::registerRESTHandler( 'checklinks', \&doCheckLinks );
 
     # Plugin correctly initialized
     return 1;
