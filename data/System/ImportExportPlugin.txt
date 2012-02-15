@@ -3,40 +3,100 @@
 One line description, required for extensions repository catalog.
    * Set SHORTDESCRIPTION = Import and export wiki data
 -->
----+!! Empty Plugin
+---+!! Import Export Plugin
 
 %SHORTDESCRIPTION%
 
-Learn how to create your own plugin in %SYSTEMWEB%.DevelopingPlugins.
+This plugin is intended to help import and export data (webs, topics, attachments) from your foswiki, or from some other source into your foswiki.
 
----++ Preferences
+Initially, it will import from an existing foswiki or twiki on the same filesystem, but I'm intending it to import using ssh, zip, or some custom mechanism.
 
-Plugin preferences should be set using =configure=, as described in
-%SYSTEMWEB%.DevelopingPlugins. You can also use
-[[%SYSTEMWEB%.PreferenceSettings][preference settings]] to define any
-user-controllable configuration. You are strongly advised
-to use the name of the plugin as a prefix, to avoid the risk of namespace
-clashes with other extensions that may try to use the same name.
+The data should then be able to transformed (for eg, twiki based topic links re-written to the new foswiki names)
 
-*BAD*
-   * Set EXAMPLE = Example setting
-   * Set FORMAT  = %d-%m-%y
-*Good*
-   * Set EMPTYPLUGIN_EXAMPLE = Example setting
-   * Set EMPTYPLUGIN_FORMAT  = %d-%m-%y
+---++ Select what to import
+
+(re-implement using a FOREACH over a IMPORTFROMHANDLER macro), and extract UI's so that others can add new handlers in their own contribs
+
+%TABPANE% 
+ %TAB{"FS"}% 
+<form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/import" method="post">
+<table width="100%" summary="%MAKETEXT{"Attach a file"}%">
+<input type="hidden" name="type" value="FS" />
+<tr>
+__you need to be foswiki admin to use this__
+  <td align="right">
+   %MAKETEXT{"local filesystem directory to import from"}%
+  </td><td>
+   <input type="text" name="fspath" value="/home/sven/src/twiki_backup" size="50" />
+  </td>
+ </tr>
+<tr>
+  <td align="right">
+   %MAKETEXT{"Import data from"}% 
+  </td><td>
+   <select name="importFrom">
+    <option value="wiki">wiki (enter path to dir containing both data and pub)</option>
+    <option value="topics">web topics (ignores attachments)</option>
+    <option value="attachments">add multiple files to a wiki  (ignores topics)</option>
+    </select>
+  </td>
+ </tr>
+<tr>
+  <td align="right">
+   %MAKETEXT{"filter list"}%
+  </td><td>
+   <select name="filterlist">
+    <option value="none">none</option>
+    <option value="twiki">convert from twiki</option>
+    </select>
+  </td>
+ </tr>
+
+
+ <tr>
+  <td align="right">
+  </td><td>
+    <input type="submit" class="foswikiSubmit" value="%MAKETEXT{"Import"}%" />  </td>
+ </tr>
+</table>
+</form>
+ %ENDTAB% 
+ %TAB{"ZIP"}% 
+---+++ implement later
+upload zip, select topic and zip attachment or enter filesystem path to zip file
+ %ENDTAB% 
+ %TAB{"SSH"}% 
+---+++ implement later
+enter ssh path to FS? (or is this?)
+ %ENDTAB% 
+ %TAB{"This-Foswiki"}% 
+---+++ implement later
+click submit
+ %ENDTAB% 
+%ENDTABPANE% 
+
+---++ pre-development thinking
+
+   1 a set of ImportExportPlugin::From classes that implement =getListOfWebs=, =getListOfTopics=, =getListOfAttachments= and =getItem=
+   2 have a UI that allows the user to select the From class and add parameters to it
+      * From::FS and From::SSH would require permissions (somehow), whereas From::Zip or From::Http might work differently
+   3 given a From handler, the user can select a 'set' of items that are available (from a UI) and a destination, and hit 'go'
+   4 a set of ImportExportPlugin::Transforms can be selected to be used while importing a set (none, twiki->foswiki, cvs->forms topics, funny encoding->utf8, change topic name)
+
+
 
 ---++ Installation
 %$INSTALL_INSTRUCTIONS%
 
 ---++ Info
 
-|  Author: | SvenDowideit |
-|  Copyright: | &copy; 2011, Foswiki Contributors |
+|  Author: | Foswiki:Main.SvenDowideit |
+|  Copyright: | &copy; 2011, SvenDowideit@fosiki.com |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
-|  1.0.0 (XX Mmm 20XX): | Initial version |
+|  1.0.0 (20 Feb 2012: | Initial version |
 |  Home: | http://foswiki.org/Extensions/%TOPIC% |
 |  Support: | http://foswiki.org/Support/%TOPIC% |
 
