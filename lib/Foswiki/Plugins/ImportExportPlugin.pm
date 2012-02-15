@@ -237,31 +237,14 @@ sub getFilterFunc {
     }
 
     #TODO: scary, i can call anything?
+    $filter = "Foswiki::Plugins::ImportExportPlugin::Filters::$filter";
+    eval "use Foswiki::Plugins::ImportExportPlugin::Filters";
+    die "can't load Filters" if $@;
     my $funcRef = \&$filter;
     if ( defined($params) ) {
         $funcRef = sub { $funcRef->( @_, $params ) };
     }
     return $funcRef;
-}
-
-#extract into filter classes
-sub twiki {
-    my ( $web, $topic, $text, $params ) = @_;
-
-    #print STDERR " twiki($web, $topic)";
-    my $result = 'nochange';
-
-    #-> ($result, $web, $topic, $text)
-    if ( $topic =~ /TWiki/ ) {
-
-        #TODO: apply conversions from TCP..
-        $topic =~ s/^TWiki/Wiki/g;
-        $result = 'convert topic name from TWiki to Wiki';
-
-        #print STDERR "  ==>> ($web, $topic)\n";
-
-    }
-    return ( $result, $web, $topic, $text );
 }
 
 sub getFromHandler {

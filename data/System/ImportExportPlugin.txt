@@ -17,6 +17,14 @@ The data should then be able to transformed (for eg, twiki based topic links re-
 
 (re-implement using a FOREACH over a IMPORTFROMHANDLER macro), and extract UI's so that others can add new handlers in their own contribs
 
+
+%IF{
+    "context ImportExportPluginEnabled"
+    then="running"
+    else="You need to enable the ImportExportPlugin in configure"
+}%
+
+
 %TABPANE% 
  %TAB{"FS"}% 
 <form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/import" method="post">
