@@ -83,6 +83,13 @@ sub doCheck {
       Foswiki::Sandbox::untaintUnchecked( $query->{param}->{filterlist}[0] );
     my $webs =
       Foswiki::Sandbox::untaintUnchecked( $query->{param}->{webs}[0] );
+
+   if (!defined($webs)) {
+	#presume a vague demad for docco
+	print "./rest /ImportExportPlugin/check filterlist=chklinks webs=System fromtype=foswiki\n";
+	exit;
+   }
+
     $webs =~ s/,/;/g;
 
     $filterlist = 'selectwebs('.$webs.'), skiptopics(ImportExportPluginCheckReport), '.$filterlist;
@@ -95,7 +102,7 @@ sub doCheck {
         #parameters to filters: skip(Delete*) or similar
         my $f = getFilterFunc($filter);
         if ( defined($f) ) {
-            print STDERR "adding filter\n";
+            print STDERR "adding filter : $filter\n";
             push( @filter_funcs, $f );
         }
     }
