@@ -61,7 +61,7 @@ my %testedLinkCache;
 
 sub chkLinks {
     my ( $result, $web, $topic, $text, $params ) = @_;
-    #return ('nochange', , $web, $topic, $text, \()) unless ($topic eq 'AccessControl');
+    #return ('nochange', , $web, $topic, $text, \()) unless ($topic eq 'CommandAndCGIScripts');
 #print STDERR "====================== $web, $topic\n";
     #TODO: search url  links to topics (and add fixup)
     #TODO: does not do plurals, even thought Foswiki core does
@@ -69,7 +69,7 @@ sub chkLinks {
     $Foswiki::Plugins::ImportExportPlugin::checkingLinks = 1;
     %Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered = ();
     #test for bad links in rendered html
-    my $expandedTML = Foswiki::Func::expandCommonVariables( $text, $web, $topic );
+    my $expandedTML = Foswiki::Func::expandCommonVariables( $text, $topic, $web );
     my $html = Foswiki::Func::renderText( $expandedTML, $web, $topic );
     my %links;
     $html =~ s/href=['"](.*?)['"]/$links{$1}++/gem;
@@ -107,15 +107,26 @@ sub chkLinks {
     my $scriptBasePath = Foswiki::Func::getScriptUrlPath();
     my $pubPath = Foswiki::Func::getPubUrlPath();
     my $pubDir = Foswiki::Func::getPubDir();
+    my $urlHost = Foswiki::Func::getUrlHost();
+    $urlHost =~ s/\//\\\//g;
+
     foreach my $link (keys(%links)) {
         
         if (not exists $testedLinkCache{$link}) {
-            if ($link =~ /^[#\?]/) {
+            if ($link =~ /^(mailto|ftp|file)/) {
+                #ignoring email, ftp, file ... links
+                $testedLinkCache{$link} = $1;    #fake it being OK
+            } elsif ($link =~ /^[#\?]/) {
                 #this is a TOC link to the topic itself, just that it get rendered very poorly by the restHandler context
                 $testedLinkCache{$link} = 'rest';    #fake it being OK
             } elsif ($link =~ /($restBase|$restBasePath)/) {
                 #the text rendering is using this rest handler as the basurl for tableedit and stuff.
                 $testedLinkCache{$link} = 'rest';    #fake it being OK
+            } elsif (($link =~ /^http/i) && !($link =~ /^$urlHost/i)) {
+                    #try to ignore url's that are not ours
+#TODO: this is dangerous, as we'll be ignoring url's from which the wiki data came
+#TODO: create list and report on external links separatly - optionally follow the link!
+                    $testedLinkCache{$link} = 'EXTERNAL LINK';    #fake it being OK
             } else {
                 my $webtopic = $link;
                 $webtopic =~ s/[\#\?].*$//;
@@ -125,11 +136,12 @@ sub chkLinks {
                         #this is an edit link to a topic thats listed in a WikiWord link so we don't want to list it twice
                         $testedLinkCache{$link} = 'duplicate';
 #                   }
-                } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)\/configure/) {
-                    $testedLinkCache{$link} = 'configure';    #fake it being OK
+                } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)\/(configure|statistics)/) {
+                    $testedLinkCache{$link} = $2;    #fake it being OK
                 } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)(\/[a-z]+\/)(.*)$/) {
                     my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $3);
                     $testedLinkCache{$link} = Foswiki::Func::topicExists($web, $topic);
+                    $testedLinkCache{$link} = 'rest' if ($web eq 'ImportExportPlugin' && $topic eq 'Check');
                 } elsif ($webtopic =~ /.*$pubPath(.*)/) {
                     if (-e $pubDir.$1) {
                         $testedLinkCache{$link} = 'attachment exists';
