@@ -68,7 +68,8 @@ sub chkLinks {
     $Foswiki::Plugins::ImportExportPlugin::checkingLinks = 1;
     %Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered = ();
     #test for bad links in rendered html
-    my $html = Foswiki::Func::renderText( $text, $web, $topic );
+    my $expandedTML = Foswiki::Func::expandCommonVariables( $text, $web, $topic );
+    my $html = Foswiki::Func::renderText( $expandedTML, $web, $topic );
     my %links;
     $html =~ s/href=['"](.*?)['"]/$links{$1}++/gem;
     
