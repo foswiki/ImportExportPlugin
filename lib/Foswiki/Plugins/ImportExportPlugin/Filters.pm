@@ -61,7 +61,8 @@ my %testedLinkCache;
 
 sub chkLinks {
     my ( $result, $web, $topic, $text, $params ) = @_;
-    
+    #return ('nochange', , $web, $topic, $text, \()) unless ($topic eq 'AccessControl');
+#print STDERR "====================== $web, $topic\n";
     #TODO: search url  links to topics (and add fixup)
     #TODO: does not do plurals, even thought Foswiki core does
     
@@ -73,16 +74,23 @@ sub chkLinks {
     my %links;
     $html =~ s/href=['"](.*?)['"]/$links{$1}++/gem;
     
-    #remove links to things that exist
+    #remove links to things that exist - start with renderWikiWordHandler
     foreach my $link (keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) {
         if (not exists $testedLinkCache{$link}) {
             my $webtopic = $link;
-            $webtopic =~ s/(INCLUDINGWEB)\.//;
             my ($lweb, $ltopic) = Foswiki::Func::normalizeWebTopicName($web, $webtopic);
-            $testedLinkCache{$link} = Foswiki::Func::topicExists($lweb, $ltopic);
+            #lets see if we can detect ANCRONYMs
+            my $renderedlink = Foswiki::Func::internalLink( '', $lweb, $ltopic, $ltopic);
+            $testedLinkCache{$link} = 'nolink' if ($renderedlink eq $ltopic);
+            #print STDERR "OOOOOOOOOO $link($web, $webtopic): $lweb, $ltopic => $renderedlink\n"
+            if (not exists $testedLinkCache{$link}) {
+                $testedLinkCache{$link} = Foswiki::Func::topicExists($lweb, $ltopic);
+            }
         }
         
         #should not delete things that are not wikiwords unless the user selects it
+        
+        
         
         if ($testedLinkCache{$link}) {
             delete $Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered{$link};
@@ -95,23 +103,37 @@ sub chkLinks {
     my $viewBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'view');
     my $editBase = Foswiki::Func::getScriptUrl(undef, undef, 'edit');
     my $editBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'edit');
+    my $scriptBase = Foswiki::Func::getScriptUrl();
+    my $scriptBasePath = Foswiki::Func::getScriptUrlPath();
+    my $pubPath = Foswiki::Func::getPubUrlPath();
+    my $pubDir = Foswiki::Func::getPubDir();
     foreach my $link (keys(%links)) {
+        
         if (not exists $testedLinkCache{$link}) {
-            if ($link =~ /($restBase|$restBasePath)/) {
+            if ($link =~ /^[#\?]/) {
+                #this is a TOC link to the topic itself, just that it get rendered very poorly by the restHandler context
+                $testedLinkCache{$link} = 'rest';    #fake it being OK
+            } elsif ($link =~ /($restBase|$restBasePath)/) {
                 #the text rendering is using this rest handler as the basurl for tableedit and stuff.
                 $testedLinkCache{$link} = 'rest';    #fake it being OK
             } else {
                 my $webtopic = $link;
-                $webtopic =~ s/[#?].*$//;
-                if ($webtopic =~ s/($editBase|$editBasePath)(.*?)/$2/g) {
-#                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $webtopic);
+                $webtopic =~ s/[\#\?].*$//;
+                if ($webtopic =~ /($editBase|$editBasePath)(.*)$/) {
+#                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $2);
 #                   if (exists $testedLinkCache{"$web.$topic"}) {
                         #this is an edit link to a topic thats listed in a WikiWord link so we don't want to list it twice
                         $testedLinkCache{$link} = 'duplicate';
 #                   }
-                } elsif ($webtopic =~ /($viewBase|$viewBasePath)(.*)/) {
-                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $2);
+                } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)\/configure/) {
+                    $testedLinkCache{$link} = 'configure';    #fake it being OK
+                } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)(\/[a-z]+\/)(.*)$/) {
+                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $3);
                     $testedLinkCache{$link} = Foswiki::Func::topicExists($web, $topic);
+                } elsif ($webtopic =~ /.*$pubPath(.*)/) {
+                    if (-e $pubDir.$1) {
+                        $testedLinkCache{$link} = 'attachment exists';
+                    }
                 }
             }
         }

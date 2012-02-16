@@ -267,11 +267,8 @@ Return the new link text.
 sub renderWikiWordHandler {
     my( $linkText, $hasExplicitLinkLabel, $web, $topic ) = @_;
     if ($checkingLinks) {
-        print STDERR "--------   * $linkText -> =$web= . =$topic= :: ".($hasExplicitLinkLabel?1:0).":";
+        #print STDERR "--------   * $linkText -> =$web= . =$topic= :: ".($hasExplicitLinkLabel?1:0).":";
 #        if ($hasExplicitLinkLabel) {
-            #Beats me why these vars have lost their %'s'
-            $web =~ s/SYSTEMWEB/$Foswiki::cfg{SystemWebName}/g;
-            $web =~ s/USERSWEB/$Foswiki::cfg{UsersWebName}/g;
             $wikiWordsRendered{"$web.$topic"}++;
 #        } else {
 #            $wikiWordsRendered{$linkText}++;

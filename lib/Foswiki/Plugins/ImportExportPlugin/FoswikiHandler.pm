@@ -91,9 +91,10 @@ sub check {
     }
 
     #list of links and how often they are used in that web
+    my $linkCount = scalar(keys(%links));
     #push( @output, map { $_ . ' : ' . join(' , ', @{$links{$_}}) } sort(keys(%links)) );
 
-    return join( "<br>\n", ( @output, "\n<hr>\n" ) );
+    return join( "<br>\n", ( @output, "\n<hr>\nnumber of broken links: $linkCount\n<hr>\n" ) );
 
 }
 
