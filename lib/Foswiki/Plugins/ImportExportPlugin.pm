@@ -16,49 +16,18 @@ use warnings;
 use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 
-# $VERSION is referred to by Foswiki, and is the only global variable that
-# *must* exist in this package. This should always be in the format
-# $Rev$ so that Foswiki can determine the checked-in status of the
-# extension.
 our $VERSION = '$Rev$';
-
-# $RELEASE is used in the "Find More Extensions" automation in configure.
-# It is a manually maintained string used to identify functionality steps.
-# You can use any of the following formats:
-# tuple   - a sequence of integers separated by . e.g. 1.2.3. The numbers
-#           usually refer to major.minor.patch release or similar. You can
-#           use as many numbers as you like e.g. '1' or '1.2.3.4.5'.
-# isodate - a date in ISO8601 format e.g. 2009-08-07
-# date    - a date in 1 Jun 2009 format. Three letter English month names only.
-# Note: it's important that this string is exactly the same in the extension
-# topic - if you use %$RELEASE% with BuildContrib this is done automatically.
 our $RELEASE = '1.0.0';
 our $SHORTDESCRIPTION = 'Import and export wiki data';
 our $NO_PREFS_IN_TOPIC = 1;
 
+our $checkingLinks = 0;
+our %wikiWordsRendered;
+
 =begin TML
 
 ---++ initPlugin($topic, $web, $user) -> $boolean
-   * =$topic= - the name of the topic in the current CGI query
-   * =$web= - the name of the web in the current CGI query
-   * =$user= - the login name of the user
-   * =$installWeb= - the name of the web the plugin topic is in
-     (usually the same as =$Foswiki::cfg{SystemWebName}=)
 
-*REQUIRED*
-
-Called to initialise the plugin. If everything is OK, should return
-a non-zero value. On non-fatal failure, should write a message
-using =Foswiki::Func::writeWarning= and return 0. In this case
-%<nop>FAILEDPLUGINS% will indicate which plugins failed.
-
-In the case of a catastrophic failure that will prevent the whole
-installation from working safely, this handler may use 'die', which
-will be trapped and reported in the browser.
-
-__Note:__ Please align macro names with the Plugin name, e.g. if
-your Plugin is called !FooBarPlugin, name macros FOOBAR and/or
-FOOBARSOMETHING. This avoids namespace issues.
 
 =cut
 
@@ -93,10 +62,57 @@ sub initPlugin {
     # Allow a sub to be called from the REST interface
     # using the provided alias
     Foswiki::Func::registerRESTHandler( 'import', \&doImport );
-    #Foswiki::Func::registerRESTHandler( 'checklinks', \&doCheckLinks );
+    Foswiki::Func::registerRESTHandler( 'check', \&doCheck );
 
     # Plugin correctly initialized
     return 1;
+}
+
+=begin TML
+
+---++ doCheck($session) -> $text
+
+
+=cut
+
+sub doCheck {
+    my ( $session, $subject, $verb, $response ) = @_;
+
+    my $query = $session->{request};
+    my $filterlist =
+      Foswiki::Sandbox::untaintUnchecked( $query->{param}->{filterlist}[0] );
+    my $webs =
+      Foswiki::Sandbox::untaintUnchecked( $query->{param}->{webs}[0] );
+    $webs =~ s/,/;/g;
+
+    $filterlist = 'selectwebs('.$webs.'), skiptopics(ImportExportPluginCheckReport), '.$filterlist;
+
+
+    my @filter_funcs;
+
+    foreach my $filter ( split( /,\s*/, $filterlist ) ) {
+
+        #parameters to filters: skip(Delete*) or similar
+        my $f = getFilterFunc($filter);
+        if ( defined($f) ) {
+            print STDERR "adding filter\n";
+            push( @filter_funcs, $f );
+        }
+    }
+
+    my $type = lc(
+        Foswiki::Sandbox::untaintUnchecked(
+            $query->{param}->{fromtype}[0] || 'FS'
+        )
+    );
+
+    my $handler = getFromHandler( $type, $query, \@filter_funcs );
+#TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
+    my $output = $handler->check();
+    $output .= "\n\n" . $handler->finish();
+    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheckReport', $output);
+    return $output;
+
 }
 
 =begin TML
@@ -130,9 +146,12 @@ sub doImport {
     my $query = $session->{request};
     my $filterlist =
       Foswiki::Sandbox::untaintUnchecked( $query->{param}->{filterlist}[0] );
+    $filterlist = ',selectwebs(Know; Hsa), '.$filterlist;
+
+
     my @filter_funcs;
 
-    foreach my $filter ( split( /[,\s]/, $filterlist ) ) {
+    foreach my $filter ( split( /,\s*/, $filterlist ) ) {
 
         #parameters to filters: skip(Delete*) or similar
         my $f = getFilterFunc($filter);
@@ -169,12 +188,17 @@ sub getFilterFunc {
     }
 
     #TODO: scary, i can call anything?
-    $filter = "Foswiki::Plugins::ImportExportPlugin::Filters::$filter";
     eval "use Foswiki::Plugins::ImportExportPlugin::Filters";
     die "can't load Filters" if $@;
-    my $funcRef = \&$filter;
+
+    my $funcRef = $Foswiki::Plugins::ImportExportPlugin::Filters::switchboard{$filter};
+    die "---$filter---" unless (defined($funcRef));
+    return undef unless (defined($funcRef));
     if ( defined($params) ) {
-        $funcRef = sub { $funcRef->( @_, $params ) };
+        my $originalFuncRef = $funcRef;
+        $funcRef = sub { 
+            $originalFuncRef->( @_, $params ); 
+        };
     }
     return $funcRef;
 }
@@ -215,6 +239,40 @@ sub getFromHandler {
 #    # $params->{_DEFAULT} will be 'hamburger'
 #    # $params->{sideorder} will be 'onions'
 #}
+
+=begin TML
+
+---++ renderWikiWordHandler($linkText, $hasExplicitLinkLabel, $web, $topic) -> $linkText
+   * =$linkText= - the text for the link i.e. for =[<nop>[Link][blah blah]]=
+     it's =blah blah=, for =BlahBlah= it's =BlahBlah=, and for [[Blah Blah]] it's =Blah Blah=.
+   * =$hasExplicitLinkLabel= - true if the link is of the form =[<nop>[Link][blah blah]]= (false if it's ==<nop>[Blah]] or =BlahBlah=)
+   * =$web=, =$topic= - specify the topic being rendered
+
+Called during rendering, this handler allows the plugin a chance to change
+the rendering of labels used for links.
+
+Return the new link text.
+
+*Since:* Foswiki::Plugins::VERSION 2.0
+
+=cut
+
+sub renderWikiWordHandler {
+    my( $linkText, $hasExplicitLinkLabel, $web, $topic ) = @_;
+    if ($checkingLinks) {
+        print STDERR "--------   * $linkText -> =$web= . =$topic= :: ".($hasExplicitLinkLabel?1:0).":";
+#        if ($hasExplicitLinkLabel) {
+            #Beats me why these vars have lost their %'s'
+            $web =~ s/SYSTEMWEB/$Foswiki::cfg{SystemWebName}/g;
+            $web =~ s/USERSWEB/$Foswiki::cfg{UsersWebName}/g;
+            $wikiWordsRendered{"$web.$topic"}++;
+#        } else {
+#            $wikiWordsRendered{$linkText}++;
+#        }
+    }
+    return $linkText;
+}
+
 
 1;
 

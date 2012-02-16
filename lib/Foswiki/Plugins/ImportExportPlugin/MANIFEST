@@ -5,7 +5,9 @@ data/Sandbox/PluginTestImportExportPlugin.txt 0644 Examples
 
 lib/Foswiki/Plugins/ImportExportPlugin.pm 0444 Perl module
 lib/Foswiki/Plugins/ImportExportPlugin/FsHandler.pm 0444 Perl module
+lib/Foswiki/Plugins/ImportExportPlugin/FoswikiHandler.pm 0444 Perl module
 lib/Foswiki/Plugins/ImportExportPlugin/Filters.pm 0444 Perl module
+
 
 lib/Foswiki/Plugins/ImportExportPlugin/Config.spec 0444 Configuration
 

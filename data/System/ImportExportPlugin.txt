@@ -13,7 +13,7 @@ Initially, it will import from an existing foswiki or twiki on the same filesyst
 
 The data should then be able to transformed (for eg, twiki based topic links re-written to the new foswiki names)
 
----++ Select what to import
+---++ Import into this foswiki
 
 (re-implement using a FOREACH over a IMPORTFROMHANDLER macro), and extract UI's so that others can add new handlers in their own contribs
 
@@ -29,7 +29,7 @@ The data should then be able to transformed (for eg, twiki based topic links re-
  %TAB{"FS"}% 
 <form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/import" method="post">
 <table width="100%" summary="%MAKETEXT{"Attach a file"}%">
-<input type="hidden" name="type" value="FS" />
+<input type="hidden" name="fromtype" value="FS" />
 <tr>
 __you need to be foswiki admin to use this__
   <td align="right">
@@ -59,8 +59,6 @@ __you need to be foswiki admin to use this__
     </select>
   </td>
  </tr>
-
-
  <tr>
   <td align="right">
   </td><td>
@@ -77,12 +75,46 @@ upload zip, select topic and zip attachment or enter filesystem path to zip file
 ---+++ implement later
 enter ssh path to FS? (or is this?)
  %ENDTAB% 
- %TAB{"This-Foswiki"}% 
+ %TAB{"foswiki"}% 
 ---+++ implement later
-click submit
+a way to copy one or more web's contents into one or more web
  %ENDTAB% 
 %ENDTABPANE% 
 
+---++ Check / fix items in this foswiki
+
+%TABPANE% 
+ %TAB{"Foswiki"}% 
+<form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/check" method="post">
+<table width="100%" summary="%MAKETEXT{""}%">
+<input type="hidden" name="fromtype" value="foswiki" />
+<tr>
+Will create a report in the Sandbox.ImportExportPluginCheckReport  __TODO: with restricted ACL?__
+  <td align="right">
+   %MAKETEXT{"webs to preform checks on"}%
+  </td><td>
+   <select name="webs" class="foswikiSelect"> %WEBLIST{ "<option $marker>$name</option>" webs="webtemplate,public" selection="Sandbox" separator=" "}%</select>
+  </td>
+ </tr>
+<tr>
+  <td align="right">
+   %MAKETEXT{"checks to perform"}%
+  </td><td>
+   <select name="filterlist">
+    <option value="none">none</option>
+    <option value="chklinks">check links (renders each topic to html then looks for urls)</option>
+    </select>
+  </td>
+ </tr>
+ <tr>
+  <td align="right">
+  </td><td>
+    <input type="submit" class="foswikiSubmit" value="%MAKETEXT{"Check"}%" />  </td>
+ </tr>
+</table>
+</form>
+ %ENDTAB% 
+%ENDTABPANE% 
 ---++ pre-development thinking
 
    1 a set of ImportExportPlugin::From classes that implement =getListOfWebs=, =getListOfTopics=, =getListOfAttachments= and =getItem=

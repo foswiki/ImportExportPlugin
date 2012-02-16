@@ -38,6 +38,7 @@ sub new {
 
 =cut
 
+#TODO: ffs, crawford these
 my @webs;
 my %files;
 
@@ -71,7 +72,6 @@ sub import {
 
         foreach my $web (@webs) {
             print STDERR "$web \n";
-            next unless ( $web eq 'Hsa' );
 
             #see if it exists - skip/merge
             if ( -e $Foswiki::cfg{DataDir} . '/' . $web ) {

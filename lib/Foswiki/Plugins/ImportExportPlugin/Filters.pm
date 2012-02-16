@@ -14,6 +14,161 @@ package Foswiki::Plugins::ImportExportPlugin::Filters;
 use strict;
 use warnings;
 
+our %switchboard = (
+    selectwebs => \&selectwebs,
+    skiptopics => \&skiptopics,
+    twiki => \&twiki,
+    chklinks => \&chkLinks
+);
+
+=begin TML
+
+---++ ClassMethod TODO( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+
+TODO: need to add the following filters
+   * html - convert a set of html files to foswiki format, need a remove_prefix, remove_postfix, html2tml, 
+   * rename webs - list of from -> to conversions, including some mechanism to merge webs together (drop dups, merge dupes, rename second dup..)
+   * skipdistrotopics - work out what topics are unmodified by wiki users (ie, shipped in the release) and skip those that were from the old (or twiki) release
+
+=cut
+
+
+=begin TML
+
+---++ ClassMethod nothing( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+
+does nothing - copy to create a new filter.
+
+=cut
+
+sub nothing {
+    my ( $result, $web, $topic, $text, $params ) = @_;
+    
+    return ( $result, $web, $topic, $text );
+}
+
+
+=begin TML
+
+---++ ClassMethod chkLinks( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+
+   * chkLinks - check for URLs and wiki links, report on them with frequency, broken link, missing topic, html links to in-wiki topics
+      * plus a 'fixup' option :)
+
+=cut
+
+my %testedLinkCache;
+
+sub chkLinks {
+    my ( $result, $web, $topic, $text, $params ) = @_;
+    
+    #TODO: search url  links to topics (and add fixup)
+    #TODO: does not do plurals, even thought Foswiki core does
+    
+    $Foswiki::Plugins::ImportExportPlugin::checkingLinks = 1;
+    %Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered = ();
+    #test for bad links in rendered html
+    my $html = Foswiki::Func::renderText( $text, $web, $topic );
+    my %links;
+    $html =~ s/href=['"](.*?)['"]/$links{$1}++/gem;
+    
+    #remove links to things that exist
+    foreach my $link (keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) {
+        if (not exists $testedLinkCache{$link}) {
+            my $webtopic = $link;
+            $webtopic =~ s/(INCLUDINGWEB)\.//;
+            my ($lweb, $ltopic) = Foswiki::Func::normalizeWebTopicName($web, $webtopic);
+            $testedLinkCache{$link} = Foswiki::Func::topicExists($lweb, $ltopic);
+        }
+        
+        #should not delete things that are not wikiwords unless the user selects it
+        
+        if ($testedLinkCache{$link}) {
+            delete $Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered{$link};
+        }
+    }
+
+    my $restBase = Foswiki::Func::getScriptUrl(undef, undef, 'rest');
+    my $restBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'rest');
+    my $viewBase = Foswiki::Func::getScriptUrl(undef, undef, 'view');
+    my $viewBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'view');
+    my $editBase = Foswiki::Func::getScriptUrl(undef, undef, 'edit');
+    my $editBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'edit');
+    foreach my $link (keys(%links)) {
+        if (not exists $testedLinkCache{$link}) {
+            if ($link =~ /($restBase|$restBasePath)/) {
+                #the text rendering is using this rest handler as the basurl for tableedit and stuff.
+                $testedLinkCache{$link} = 'rest';    #fake it being OK
+            } else {
+                my $webtopic = $link;
+                $webtopic =~ s/[#?].*$//;
+                if ($webtopic =~ s/($editBase|$editBasePath)(.*?)/$2/g) {
+#                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $webtopic);
+#                   if (exists $testedLinkCache{"$web.$topic"}) {
+                        #this is an edit link to a topic thats listed in a WikiWord link so we don't want to list it twice
+                        $testedLinkCache{$link} = 'duplicate';
+#                   }
+                } elsif ($webtopic =~ /($viewBase|$viewBasePath)(.*)/) {
+                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $2);
+                    $testedLinkCache{$link} = Foswiki::Func::topicExists($web, $topic);
+                }
+            }
+        }
+        if ($testedLinkCache{$link}) {
+            delete $links{$link};
+        }
+    }
+    
+    $result = "\n      * ".join("\n      * ", keys(%links)) if (scalar(keys(%links)) > 0);
+    $result .= "\n      * WW: ".join("\n      * WW: ", keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) if (scalar(keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) > 0);
+    
+    my @links = (keys(%links), keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered));
+    return ( $result, $web, $topic, $text, \@links );
+}
+
+
+=begin TML
+
+---++ ClassMethod skiptopics( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+
+   * skiptopics - Skip topics named in list - used to skip this plugin's check reports when checking
+
+=cut
+
+sub skiptopics {
+    my ( $result, $web, $topic, $text, $params ) = @_;
+    
+    my @skiptopics = split(/;\s*/, $params);
+    if (grep(/$topic/, @skiptopics)) {
+        $result = 'skip';
+    }
+    
+    return ( $result, $web, $topic, $text );
+}
+
+
+=begin TML
+
+---++ ClassMethod selectwebs( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+
+   * selectwebs - only import a specified list of webs (csv in $params), skip the others.
+
+=cut
+
+sub selectwebs {
+    my ( $result, $web, $topic, $text, $params ) = @_;
+    
+    my @selectedwebs = split(/;\s*/, $params);
+    if (grep(/$web/, @selectedwebs)) {
+        #in
+    } else {
+        $result = 'skip';
+    }
+    
+    return ( $result, $web, $topic, $text );
+}
+
+
 =begin TML
 
 ---++ ClassMethod twiki( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
