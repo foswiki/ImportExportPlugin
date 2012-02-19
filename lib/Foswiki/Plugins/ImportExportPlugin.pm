@@ -17,7 +17,7 @@ use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 
 our $VERSION = '$Rev$';
-our $RELEASE = '1.0.0';
+our $RELEASE = '0.0.5';
 our $SHORTDESCRIPTION = 'Import and export wiki data';
 our $NO_PREFS_IN_TOPIC = 1;
 
@@ -117,7 +117,8 @@ sub doCheck {
 #TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
     my $output = $handler->check();
     $output .= "\n\n" . $handler->finish();
-    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheckReport', $output);
+    $webs =~ s/;/-/g;
+    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheck'.$webs.'Report', $output);
     return $output;
 
 }
@@ -153,13 +154,22 @@ sub doImport {
     my $query = $session->{request};
     my $filterlist =
       Foswiki::Sandbox::untaintUnchecked( $query->{param}->{filterlist}[0] );
-    $filterlist = ',selectwebs(Know; Hsa), '.$filterlist;
-
+    my $webs =
+      Foswiki::Sandbox::untaintUnchecked( $query->{param}->{webs}[0] );
+    $webs =~ s/,/;/g;
+   
+   if (!defined($webs)) {
+	#presume a vague demad for docco
+	print "./rest /ImportExportPlugin/import filterlist=twiki webs=Technology,Support fromtype=fs fspath=/home/sven/src/twiki_backup\n";
+	exit;
+   }
+   
+    $filterlist = 'selectwebs('.$webs.'), '.$filterlist;
 
     my @filter_funcs;
 
     foreach my $filter ( split( /,\s*/, $filterlist ) ) {
-
+        next if ($filter eq 'none');
         #parameters to filters: skip(Delete*) or similar
         my $f = getFilterFunc($filter);
         if ( defined($f) ) {
@@ -179,6 +189,7 @@ sub doImport {
 #TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
     my $output = $handler->import();
     $output .= "\n\n" . $handler->finish();
+    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginImportReport', $output);
     return $output;
 
 }

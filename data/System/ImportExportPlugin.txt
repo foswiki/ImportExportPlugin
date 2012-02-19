@@ -59,6 +59,12 @@ __you need to be foswiki admin to use this__
     </select>
   </td>
  </tr>
+  <td align="right">
+   %MAKETEXT{"Web names to import (comma separated)"}%
+  </td><td>
+   <input type="text" name="webs" value="Bugs,Know,Hsa,Plugins,Templates,Support,Sven" size="50" />
+  </td>
+ </tr>
  <tr>
   <td align="right">
   </td><td>

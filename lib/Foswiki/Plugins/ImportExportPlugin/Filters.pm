@@ -13,7 +13,8 @@ package Foswiki::Plugins::ImportExportPlugin::Filters;
 # Always use strict to enforce variable scoping
 use strict;
 use warnings;
-
+use Foswiki::Plurals;
+                    
 our %switchboard = (
     selectwebs => \&selectwebs,
     skiptopics => \&skiptopics,
@@ -61,7 +62,7 @@ my %testedLinkCache;
 
 sub chkLinks {
     my ( $result, $web, $topic, $text, $params ) = @_;
-    #return ('nochange', , $web, $topic, $text, \()) unless ($topic eq 'CommandAndCGIScripts');
+    #return ('nochange', , $web, $topic, $text, \()) unless ($topic eq 'PatternSkinElements');
 #print STDERR "====================== $web, $topic\n";
     #TODO: search url  links to topics (and add fixup)
     #TODO: does not do plurals, even thought Foswiki core does
@@ -85,6 +86,13 @@ sub chkLinks {
             #print STDERR "OOOOOOOOOO $link($web, $webtopic): $lweb, $ltopic => $renderedlink\n"
             if (not exists $testedLinkCache{$link}) {
                 $testedLinkCache{$link} = Foswiki::Func::topicExists($lweb, $ltopic);
+                if (not $testedLinkCache{$link} ) {
+                    # topic not found - try to singularise
+                    my $singular = Foswiki::Plurals::singularForm( $lweb, $ltopic );
+                    if ($singular) {
+                        $testedLinkCache{$link}  = Foswiki::Func::topicExists( $lweb, $singular );
+                    }
+                }
             }
         }
         
@@ -105,15 +113,18 @@ sub chkLinks {
     my $editBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'edit');
     my $scriptBase = Foswiki::Func::getScriptUrl();
     my $scriptBasePath = Foswiki::Func::getScriptUrlPath();
+    #TODO: validate that bin URL's are to scripts that exist? this might be dangerous wrt apache rewrites
+    
     my $pubPath = Foswiki::Func::getPubUrlPath();
     my $pubDir = Foswiki::Func::getPubDir();
     my $urlHost = Foswiki::Func::getUrlHost();
+    
     $urlHost =~ s/\//\\\//g;
 
     foreach my $link (keys(%links)) {
         
         if (not exists $testedLinkCache{$link}) {
-            if ($link =~ /^(mailto|ftp|file)/) {
+            if ($link =~ /^(mailto|ftp|file|irc)/) {
                 #ignoring email, ftp, file ... links
                 $testedLinkCache{$link} = $1;    #fake it being OK
             } elsif ($link =~ /^[#\?]/) {
@@ -136,12 +147,12 @@ sub chkLinks {
                         #this is an edit link to a topic thats listed in a WikiWord link so we don't want to list it twice
                         $testedLinkCache{$link} = 'duplicate';
 #                   }
-                } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)\/(configure|statistics)/) {
+                } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)\/(configure|statistics|rdiff)/) {
                     $testedLinkCache{$link} = $2;    #fake it being OK
                 } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)(\/[a-z]+\/)(.*)$/) {
                     my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $3);
                     $testedLinkCache{$link} = Foswiki::Func::topicExists($web, $topic);
-                    $testedLinkCache{$link} = 'rest' if ($web eq 'ImportExportPlugin' && $topic eq 'Check');
+                    $testedLinkCache{$link} = 'rest' if ($web eq 'ImportExportPlugin' || $topic eq 'Check');
                 } elsif ($webtopic =~ /.*$pubPath(.*)/) {
                     if (-e $pubDir.$1) {
                         $testedLinkCache{$link} = 'attachment exists';
@@ -229,7 +240,7 @@ sub twiki {
     #TODO: apply conversions from TCP..
 
     #rename user topics that contain 'TWiki'
-    if ( $topic =~ /TWiki/ ) {
+    if ( $topic =~ /^TWiki/ ) {
         $topic =~ s/^TWiki/Wiki/g;
         $result .= ', convert topic name from TWiki to Wiki';
     }
@@ -260,6 +271,10 @@ sub twiki {
         )
       ) . ')';
     $text =~ s/$oldtopics/replace('Main', $1, \$result)/gem;
+    
+    #special variables
+    $text =~ s/TWIKIWEB/$result.='textchange';'SYSTEMWEB'/ge;
+    $text =~ s/MAINWEB/$result.='textchange';'USERSWEB'/ge;
 
     #not sure how to pick Main and TWiki web names to convert..
 

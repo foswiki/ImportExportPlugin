@@ -84,7 +84,7 @@ sub check {
             }
 
             #list of links for each topic
-            push(@output, "   1 $filteredweb.$filteredtopic: $result");
+            #push(@output, "   1 $filteredweb.$filteredtopic: $result");
 
           SKIPTOPIC:
         }
@@ -92,7 +92,7 @@ sub check {
 
     #list of links and how often they are used in that web
     my $linkCount = scalar(keys(%links));
-    #push( @output, map { $_ . ' : ' . join(' , ', @{$links{$_}}) } sort(keys(%links)) );
+    push( @output, map { '   1 '. $_ . ' : ' . join(' , ', @{$links{$_}}) } sort(keys(%links)) );
 
     return join( "<br>\n", ( @output, "\n<hr>\nnumber of broken links: $linkCount\n<hr>\n" ) );
 
