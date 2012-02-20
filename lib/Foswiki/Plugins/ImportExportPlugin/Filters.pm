@@ -30,6 +30,10 @@ TODO: need to add the following filters
    * html - convert a set of html files to foswiki format, need a remove_prefix, remove_postfix, html2tml, 
    * rename webs - list of from -> to conversions, including some mechanism to merge webs together (drop dups, merge dupes, rename second dup..)
    * skipdistrotopics - work out what topics are unmodified by wiki users (ie, shipped in the release) and skip those that were from the old (or twiki) release
+   * check / fix up attachments - ./rest /UpdateAttachmentsPlugin/update -topic Web
+   * initialise Tags (given a tag, tag that topic if the topic contains the tag word) - 
+      *    my $cmd = "grep '\\-\\-\\-+' ../data/$web/*.txt | grep -s $tag | sed 's/..\\/data\\/$web\\//.\\/rest \\/TagMePlugin\\/addTag tag=$tag webtopic=$web./' | sed 's/.txt.*//' | sh";
+
 
 =cut
 
