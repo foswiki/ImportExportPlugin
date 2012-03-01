@@ -76,13 +76,7 @@ print STDERR "   2 $importFrom\n";
             print STDERR "$web \n";
 
             #see if it exists - skip/merge
-            if ( -e $Foswiki::cfg{DataDir} . '/' . $web ) {
-
-                #maybe stop - can't really - for eg, importing into Main
-            }
-            else {
-                Foswiki::Func::createWeb( $web, '_default' );
-            }
+	    my $destinationWebExists = -e $Foswiki::cfg{DataDir} . '/' . $web;
 
             #foreach topic, copy via filters
             %files = ();
@@ -140,6 +134,15 @@ print STDERR "   2 $importFrom\n";
                 }
 		next if ( $filterOutput{result} eq 'skip' );
 		last if ( $filterOutput{result} eq 'skipweb' );
+		if ( $destinationWebExists ) {
+    
+		    #maybe stop - can't really - for eg, importing into Main
+		}
+		else {
+		    print STDERR "===== creating $web";
+		    Foswiki::Func::createWeb( $web, '_default' );
+		    $destinationWebExists = 1;
+		}
 
 #TODO: for eg, could grab _default version of WebHome if its just the twiki million rev release version
 #TODO: if its a topic re-name, we need to use Func::moveTopic after everything is finished. else things get busted

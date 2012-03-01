@@ -318,7 +318,8 @@ sub userweb {
         #TODO: how to detect user customisations?
         #TODO: look for links that change is the userwebname has changed.
     }
-    
+    #TODO: look for links to the old Main web and re-write :/ this is __hard__ (probably need to leverage the chkLink functionality after the fact.)
+        
     return %params;
 }
 
@@ -367,7 +368,7 @@ sub twiki {
         $params{result} = 'skip';
     } else {
         #apply link conversions from TCP to text
-        $params{text} =~ s/$oldTWikiWebtopics/_TCP_replace('TWiki', $1, \$params{result})/gem if (defined($params{text}));
+        $params{text} =~ s/((TWiki\.)?$oldTWikiWebtopics)/_TCP_replace('TWiki', $1, \$params{result})/gem if (defined($params{text}));
         $params{text} =~ s/$oldMainWebtopics/_TCP_replace('Main', $1, \$params{result})/gem if (defined($params{text}));
         
         #special variables
@@ -377,8 +378,6 @@ sub twiki {
     
     }
 
-    #not sure how to pick Main and TWiki web names to convert..
-
     return %params;
 }
 
@@ -386,9 +385,14 @@ sub _TCP_replace {
     my $web       = shift;
     my $topic     = shift;
     my $resultRef = shift;
+    
+    my $webPrefix = '';
+    if ($topic =~ s/^TWiki\.//) {
+	$webPrefix = 'System.';
+    }
 
     $$resultRef .= " replace($topic)";
-    return $Foswiki::cfg{Plugins}{TWikiCompatibilityPlugin}
+    return $webPrefix.$Foswiki::cfg{Plugins}{TWikiCompatibilityPlugin}
       { $web . 'WebTopicNameConversion' }{$topic};
 }
 
