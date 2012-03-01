@@ -48,7 +48,9 @@ sub import {
     my $fspath =
       Foswiki::Sandbox::untaintUnchecked( $this->{cgi}->{param}->{fspath}[0] );
     my $importFrom = Foswiki::Sandbox::untaintUnchecked(
-        $this->{cgi}->{param}->{importFrom}[0] );
+        $this->{cgi}->{param}->{importFrom}[0] || 'wiki' );
+print STDERR "   1 $fspath\n";
+print STDERR "   2 $importFrom\n";
     my @output = ("import $importFrom from $fspath\n<hr>\n");
 
     if ( $importFrom eq 'wiki' ) {
@@ -76,10 +78,10 @@ sub import {
             #see if it exists - skip/merge
             if ( -e $Foswiki::cfg{DataDir} . '/' . $web ) {
 
-                #maybe stop
+                #maybe stop - can't really - for eg, importing into Main
             }
             else {
-                Foswiki::Func::createWeb( $web, '_empty' );
+                Foswiki::Func::createWeb( $web, '_default' );
             }
 
             #foreach topic, copy via filters
@@ -92,6 +94,7 @@ sub import {
                 },
                 $data . "/$web"
             );
+            if (-e $pub . "/$web" ) {
             File::Find::find(
                 {
                     wanted   => sub { findAttachments($web) },
@@ -100,8 +103,10 @@ sub import {
                 },
                 $pub . "/$web"
             );
+	    }
 
-            foreach my $topic ( keys(%files) ) {
+            foreach my $topic ( sort keys(%files) ) {
+		print STDERR "   * $topic\n";
                 my $text;
                 if ( $files{$topic}{type} eq 'topic' ) {
                     $text =
@@ -109,17 +114,32 @@ sub import {
                         Foswiki::Func::readFile( $files{$topic}{from} ) );
                 }
 
-                #filters can return 'skip', text or 'nochange'
-                my ( $result, $filteredweb, $filteredtopic, $filteredtext ) =
-                  ( 'nochange', $web, $files{$topic}{topic}, $text );
+                #filters can return 'skipweb','skip', text or 'nochange'
+                my %filterOutput = (
+				    result=>'nochange',
+				    web=>$web,
+				    topic=>$files{$topic}{topic},
+				    type => $files{$topic}{type},
+				    filename => $files{$topic}{filename},
+				    text=>$text
+				    );
                 foreach my $filter ( @{ $this->{filters} } ) {
-                    ( $result, $filteredweb, $filteredtopic, $filteredtext ) =
-                      $filter->(
-                        $result,        $filteredweb,
-                        $filteredtopic, $filteredtext
-                      );
-                    goto SKIPTOPIC if ( $result eq 'skip' );
+                    %filterOutput =
+                      $filter->(%filterOutput);
+			         if ( $filterOutput{result} eq 'skipweb' ) {
+		                    print STDERR "SKIPPING $filterOutput{web} web\n";
+		                    push(@output, "   * __SKIPPING__ $filterOutput{web} web");
+				    $web = '';
+                            last;
+                    }
+			         if ( $filterOutput{result} eq 'skip' ) {
+		                    #print STDERR "SKIPPING $filterOutput{web} , $filterOutput{topic}\n";
+		                    push(@output, "   * __SKIPPING__ $filterOutput{web} . $filterOutput{topic}");
+                            last;
+                    }
                 }
+		next if ( $filterOutput{result} eq 'skip' );
+		last if ( $filterOutput{result} eq 'skipweb' );
 
 #TODO: for eg, could grab _default version of WebHome if its just the twiki million rev release version
 #TODO: if its a topic re-name, we need to use Func::moveTopic after everything is finished. else things get busted
@@ -130,41 +150,43 @@ sub import {
                 if ( $files{$topic}{type} eq 'topic' ) {
                     $destination =
                         $Foswiki::cfg{DataDir} . '/'
-                      . $filteredweb . '/'
-                      . $filteredtopic . '.'
+                      . $filterOutput{web} . '/'
+                      . $filterOutput{topic} . '.'
                       . $files{$topic}{ext};
+                    push(@output, "   * !$web . !$topic => $filterOutput{web}.$filterOutput{topic}\n      * $filterOutput{result}");
                 }
                 else {
                     $destination =
                         $Foswiki::cfg{PubDir} . '/'
-                      . $filteredweb . '/'
-                      . $filteredtopic . '/'
-                      . $files{$topic}{filename};
-                    mkdir( $Foswiki::cfg{PubDir} . '/' . $filteredweb );
+                      . $filterOutput{web} . '/'
+                      . $filterOutput{topic} . '/'
+                      . $filterOutput{filename};
+                    mkdir( $Foswiki::cfg{PubDir} . '/' . $filterOutput{web} );
                     mkdir(  $Foswiki::cfg{PubDir} . '/'
-                          . $filteredweb . '/'
-                          . $filteredtopic );
+                          . $filterOutput{web} . '/'
+                          . $filterOutput{topic} );
+                    push(@output, "   * !$web . !$topic (".$filterOutput{filename}.") => $filterOutput{web}.$filterOutput{topic}\n      * $filterOutput{result}");
                 }
-                push( @output, $files{$topic}{from} . ' -> ' . $destination );
+#print STDERR $files{$topic}{from} . ' -> ' . $destination."\n";
+#                push( @output, $files{$topic}{from} . ' -> ' . $destination );
 
                 copy( $files{$topic}{from}, $destination );
                 if ( -e $files{$topic}{from} . ',v' ) {
                     copy( $files{$topic}{from} . ',v', $destination . ',v' );
                     `rcs -u -M $destination,v`;
                 }
-                if ( $result ne 'nochange' ) {
+                if ( $filterOutput{result} ne 'nochange' ) {
                     if ( $files{$topic}{type} eq 'topic' ) {
 
                         #commit the modified topic text
                         my $error = Foswiki::Func::saveTopicText(
-                            $filteredweb, $filteredtopic,
-                            $filteredtext, { forcenewrevision => 1 }
+                            $filterOutput{web}, $filterOutput{topic},
+                            $filterOutput{text}, { forcenewrevision => 1 }
                         );
                         push( @output, $error ) if ($error);
                     }
                 }
             }
-          SKIPTOPIC:
         }
     }
     else {
@@ -198,13 +220,16 @@ sub findfiles {
 sub findAttachments {
     if ( -f $File::Find::name && not( $_ =~ /(.*),v$/ ) ) {
 
-        $File::Find::dir =~ /\/([^\/]*)$/;
 
-        $files{ Foswiki::Sandbox::untaintUnchecked($_) } = {
+	my $file =  Foswiki::Sandbox::untaintUnchecked($_) ;
+        $File::Find::dir =~ /\/([^\/]*)$/;
+	my $topic = $1;
+#print STDERR "found $topic / $file\n";
+        $files{ $1.'/'.$file } = {
             from     => Foswiki::Sandbox::untaintUnchecked($File::Find::name),
             type     => 'attachment',
-            topic    => $1,
-            filename => Foswiki::Sandbox::untaintUnchecked($_),
+            topic    => $topic,
+            filename => $file,
         };
     }
 }

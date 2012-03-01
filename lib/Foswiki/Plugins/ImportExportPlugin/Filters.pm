@@ -17,14 +17,43 @@ use Foswiki::Plurals;
                     
 our %switchboard = (
     selectwebs => \&selectwebs,
+    selecttopics => \&selecttopics,
     skiptopics => \&skiptopics,
     twiki => \&twiki,
-    chklinks => \&chkLinks
+    chklinks => \&chkLinks,
+    text_regex => \&text_regex,
+    userweb => \&userweb
 );
+
+#used for TWiki conversions
+our $oldTWikiWebtopics = '('
+  . join(
+    '|',
+    (
+        keys(
+            %{
+                $Foswiki::cfg{Plugins}{TWikiCompatibilityPlugin}
+                  {TWikiWebTopicNameConversion}
+              }
+        )
+    )
+  ) . ')';
+our $oldMainWebtopics = '('
+  . join(
+    '|',
+    (
+        keys(
+            %{
+                $Foswiki::cfg{Plugins}{TWikiCompatibilityPlugin}
+                  {MainWebTopicNameConversion}
+              }
+        )
+    )
+  ) . ')';
 
 =begin TML
 
----++ ClassMethod TODO( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+TODO( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
 
 TODO: need to add the following filters
    * html - convert a set of html files to foswiki format, need a remove_prefix, remove_postfix, html2tml, 
@@ -32,7 +61,7 @@ TODO: need to add the following filters
    * skipdistrotopics - work out what topics are unmodified by wiki users (ie, shipped in the release) and skip those that were from the old (or twiki) release
    * check / fix up attachments - ./rest /UpdateAttachmentsPlugin/update -topic Web
    * initialise Tags (given a tag, tag that topic if the topic contains the tag word) - 
-      *    my $cmd = "grep '\\-\\-\\-+' ../data/$web/*.txt | grep -s $tag | sed 's/..\\/data\\/$web\\//.\\/rest \\/TagMePlugin\\/addTag tag=$tag webtopic=$web./' | sed 's/.txt.*//' | sh";
+      *    my $cmd = "grep '\\-\\-\\-+' ../data/$params{web}/*.txt | grep -s $tag | sed 's/..\\/data\\/$params{web}\\//.\\/rest \\/TagMePlugin\\/addTag tag=$tag webtopic=$params{web}./' | sed 's/.txt.*//' | sh";
 
 
 =cut
@@ -40,42 +69,64 @@ TODO: need to add the following filters
 
 =begin TML
 
----++ ClassMethod nothing( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+---++ ClassMethod nothing( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
 
 does nothing - copy to create a new filter.
 
 =cut
 
 sub nothing {
-    my ( $result, $web, $topic, $text, $params ) = @_;
+    my %params = @_;
     
-    return ( $result, $web, $topic, $text );
+    return %params;
 }
-
 
 =begin TML
 
----++ ClassMethod chkLinks( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+---++ ClassMethod text_regex( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
+
+runs a regex over the topic text (only)
+
+uses 2 params, separated by a ; eg:
+   * text_regex(TWiki;Wiki)
+
+=cut
+
+sub topic_regex {
+    my %params = @_;
+    
+    my ($m, $r) = split(/(?!\\);/, $params{params});
+    if (defined($r)) {
+        if ($params{text} =~ s/$m/$r/ge) {
+            $params{result} .= "topic_regex($params{web}, $params{topic}, $params{params})\n";
+        }
+    }
+
+    return %params;
+}
+
+=begin TML
+
+---++ ClassMethod chkLinks( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
 
    * chkLinks - check for URLs and wiki links, report on them with frequency, broken link, missing topic, html links to in-wiki topics
-      * plus a 'fixup' option :)
+      * TODO: plus a 'fixup' option :)
 
 =cut
 
 my %testedLinkCache;
 
 sub chkLinks {
-    my ( $result, $web, $topic, $text, $params ) = @_;
-    #return ('nochange', , $web, $topic, $text, \()) unless ($topic eq 'PatternSkinElements');
-#print STDERR "====================== $web, $topic\n";
+    my %params = @_;
+
     #TODO: search url  links to topics (and add fixup)
     #TODO: does not do plurals, even thought Foswiki core does
     
     $Foswiki::Plugins::ImportExportPlugin::checkingLinks = 1;
     %Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered = ();
     #test for bad links in rendered html
-    my $expandedTML = Foswiki::Func::expandCommonVariables( $text, $topic, $web );
-    my $html = Foswiki::Func::renderText( $expandedTML, $web, $topic );
+    my $expandedTML = Foswiki::Func::expandCommonVariables( $params{text}, $params{topic}, $params{web} );
+    my $html = Foswiki::Func::renderText( $expandedTML, $params{web}, $params{topic} );
     my %links;
     $html =~ s/href=['"](.*?)['"]/$links{$1}++/gem;
     
@@ -83,11 +134,11 @@ sub chkLinks {
     foreach my $link (keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) {
         if (not exists $testedLinkCache{$link}) {
             my $webtopic = $link;
-            my ($lweb, $ltopic) = Foswiki::Func::normalizeWebTopicName($web, $webtopic);
+            my ($lweb, $ltopic) = Foswiki::Func::normalizeWebTopicName($params{web}, $webtopic);
             #lets see if we can detect ANCRONYMs
             my $renderedlink = Foswiki::Func::internalLink( '', $lweb, $ltopic, $ltopic);
             $testedLinkCache{$link} = 'nolink' if ($renderedlink eq $ltopic);
-            #print STDERR "OOOOOOOOOO $link($web, $webtopic): $lweb, $ltopic => $renderedlink\n"
+            #print STDERR "OOOOOOOOOO $link($params{web}, $webtopic): $lweb, $ltopic => $renderedlink\n"
             if (not exists $testedLinkCache{$link}) {
                 $testedLinkCache{$link} = Foswiki::Func::topicExists($lweb, $ltopic);
                 if (not $testedLinkCache{$link} ) {
@@ -115,8 +166,11 @@ sub chkLinks {
     my $viewBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'view');
     my $editBase = Foswiki::Func::getScriptUrl(undef, undef, 'edit');
     my $editBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'edit');
-    my $scriptBase = Foswiki::Func::getScriptUrl();
-    my $scriptBasePath = Foswiki::Func::getScriptUrlPath();
+    my $scriptBase = Foswiki::Func::getScriptUrl(undef, undef);
+    my $scriptBasePath = Foswiki::Func::getScriptUrlPath(undef, undef);
+    if ($scriptBasePath =~ /^http:\/\/(.*?)\/(.*)$/) {
+	$scriptBasePath = $2;
+    }
     #TODO: validate that bin URL's are to scripts that exist? this might be dangerous wrt apache rewrites
     
     my $pubPath = Foswiki::Func::getPubUrlPath();
@@ -145,18 +199,21 @@ sub chkLinks {
             } else {
                 my $webtopic = $link;
                 $webtopic =~ s/[\#\?].*$//;
+#print STDERR "==== $webtopic - $scriptBase|$scriptBasePath\n";
+#$webtopic =~ /($scriptBase|$scriptBasePath)(\/[a-z]+\/)(.*)$/;
+#print STDERR "====== $1, $2, $3\n";
                 if ($webtopic =~ /($editBase|$editBasePath)(.*)$/) {
-#                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $2);
-#                   if (exists $testedLinkCache{"$web.$topic"}) {
+#                    my ($params{web}, $params{topic}) = Foswiki::Func::normalizeWebTopicName('', $2);
+#                   if (exists $testedLinkCache{"$params{web}.$params{topic}"}) {
                         #this is an edit link to a topic thats listed in a WikiWord link so we don't want to list it twice
                         $testedLinkCache{$link} = 'duplicate';
 #                   }
                 } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)\/(configure|statistics|rdiff)/) {
                     $testedLinkCache{$link} = $2;    #fake it being OK
                 } elsif ($webtopic =~ /($scriptBase|$scriptBasePath)(\/[a-z]+\/)(.*)$/) {
-                    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName('', $3);
-                    $testedLinkCache{$link} = Foswiki::Func::topicExists($web, $topic);
-                    $testedLinkCache{$link} = 'rest' if ($web eq 'ImportExportPlugin' || $topic eq 'Check');
+                    ($params{web}, $params{topic}) = Foswiki::Func::normalizeWebTopicName('', $3);
+                    $testedLinkCache{$link} = Foswiki::Func::topicExists($params{web}, $params{topic});
+                    $testedLinkCache{$link} = 'rest' if ($params{web} eq 'ImportExportPlugin'  || $params{topic} eq 'check' || $params{topic} eq 'Check');
                 } elsif ($webtopic =~ /.*$pubPath(.*)/) {
                     if (-e $pubDir.$1) {
                         $testedLinkCache{$link} = 'attachment exists';
@@ -169,65 +226,132 @@ sub chkLinks {
         }
     }
     
-    $result = "\n      * ".join("\n      * ", keys(%links)) if (scalar(keys(%links)) > 0);
-    $result .= "\n      * WW: ".join("\n      * WW: ", keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) if (scalar(keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) > 0);
+    $params{result} = "\n      * ".join("\n      * ", keys(%links)) if (scalar(keys(%links)) > 0);
+    $params{result} .= "\n      * WW: ".join("\n      * WW: ", keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) if (scalar(keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered)) > 0);
     
-    my @links = (keys(%links), keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered));
-    return ( $result, $web, $topic, $text, \@links );
+    $params{links} = \(keys(%links), keys(%Foswiki::Plugins::ImportExportPlugin::wikiWordsRendered));
+    return %params;
 }
 
 
 =begin TML
 
----++ ClassMethod skiptopics( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+---++ ClassMethod skiptopics( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
 
    * skiptopics - Skip topics named in list - used to skip this plugin's check reports when checking
 
 =cut
 
 sub skiptopics {
-    my ( $result, $web, $topic, $text, $params ) = @_;
+    my %params = @_;
     
-    my @skiptopics = split(/;\s*/, $params);
-    if (grep(/$topic/, @skiptopics)) {
-        $result = 'skip';
+    my @skiptopics = split(/;\s*/, $params{params});
+    if (grep(/$params{topic}/, @skiptopics)) {
+        $params{result} = 'skip';
     }
     
-    return ( $result, $web, $topic, $text );
+    return %params;
 }
 
 
 =begin TML
 
----++ ClassMethod selectwebs( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+---++ ClassMethod selecttopics( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
 
-   * selectwebs - only import a specified list of webs (csv in $params), skip the others.
+   * selecttopics - Skip topics other than those named in list
+
+=cut
+
+sub selecttopics {
+    my %params = @_;
+    
+    my @selecttopics = split(/;\s*/, $params{params});
+    if (! grep(/$params{topic}/, @selecttopics)) {
+        $params{result} = 'skip';
+    }
+    
+    return %params;
+}
+
+
+=begin TML
+
+---++ ClassMethod userweb( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
+
+   * userweb(fromwikitype;fromwebname) - used to import a USERWEB (Main by default) from a potentially old installation to this wiki (hardcoded to import to Main web atm)
+      * fromwebtype - twiki or foswiki (default to foswiki)
+      * userwebname - webname to import users from (defaults to Main)
+   * uses the TCP hash to convert topic names from twiki to foswiki
+   * assumes TopicuserMapping
+   * TODO: should really try to deal with htpasswd file too?
+
+
+=cut
+
+sub userweb {
+    my %params = @_;
+    
+    my ($wikitype, $userwebname) = split(/;\s*/, $params{params});
+    $wikitype = 'foswiki' unless (defined($wikitype));
+    $userwebname = 'Main' unless (defined($userwebname));
+    
+    if ($params{web} eq $userwebname) {
+        $params{topic} =~ s/^$oldMainWebtopics$/_TCP_replace('Main', $1, \$params{result})/e;
+        #first stab, don't overwrite any existing topics
+	if ($params{type} eq 'topic') {
+	    if (Foswiki::Func::topicExists('Main', $params{topic})) {
+		$params{result} = 'skip';
+	    }	    
+	} else {
+	    if (Foswiki::Func::attachmentExists('Main', $params{topic}, $params{filename})) {
+		$params{result} = 'skip';
+	    }	    
+	}
+	if ($params{result} ne 'skip') {
+            if ($params{web} ne 'Main') {
+                $params{result} .= ",userweb($params{web} Main.$params{topic})";
+                $params{web} = 'Main';
+            }
+        }
+        #TODO: need to copy over AdminGroup membership
+        #TODO: consider web and twiki preferences - at minimum ACLs
+        #TODO: how to detect user customisations?
+        #TODO: look for links that change is the userwebname has changed.
+    }
+    
+    return %params;
+}
+
+=begin TML
+
+---++ ClassMethod selectwebs( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
+
+   * selectwebs - only import a specified list of webs (csv in $params{params}), skip the others.
 
 =cut
 
 sub selectwebs {
-    my ( $result, $web, $topic, $text, $params ) = @_;
+    my %params = @_;
     
-    my @selectedwebs = split(/;\s*/, $params);
-    if (grep(/$web/, @selectedwebs)) {
+    my @selectedwebs = split(/;\s*/, $params{params});
+    if (grep(/$params{web}/, @selectedwebs)) {
         #in
     } else {
-        $result = 'skip';
+        $params{result} = 'skipweb';
     }
     
-    return ( $result, $web, $topic, $text );
+    return %params;
 }
 
 
 =begin TML
 
----++ ClassMethod twiki( $web, $topic, $text, $params ) -> ( $result, $web, $topic, $text )
+---++ ClassMethod twiki( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
 
-   1 convert topics with names containting 'TWiki' to 'Wiki'
-   2 work out what topics in the Main web are edited by users and xfer / merge them
-        * that essentially means loading the txt into a Meta obj and seeing what the author is? (regex good)
-   3 scan topic texts for links to TWiki or renamed topics or attachments and update them
-   4 scan for URL based links to wiki items and replace where possible.
+   1 convert topic text that refers to TWiki topics who's names have changed
+      * attachments?
+   2 Main web renames and migration is left to the userweb filter
+
 
 report on everything that you did!
    
@@ -235,57 +359,30 @@ report on everything that you did!
 
 =cut
 
-#extract into filter classes
 sub twiki {
-    my ( $result, $web, $topic, $text, $params ) = @_;
+    my %params = @_;
 
-    print STDERR " twiki($web, $topic)";
+    if ($params{web} eq 'TWiki') {
+        #if someone's importing the TWiki web, lets presume its accidental and not.
+        $params{result} = 'skip';
+    } else {
+        #apply link conversions from TCP to text
+        $params{text} =~ s/$oldTWikiWebtopics/_TCP_replace('TWiki', $1, \$params{result})/gem if (defined($params{text}));
+        $params{text} =~ s/$oldMainWebtopics/_TCP_replace('Main', $1, \$params{result})/gem if (defined($params{text}));
+        
+        #special variables
+        $params{text} =~ s/TWIKIWEB/$params{result}.='textchange';'SYSTEMWEB'/ge if (defined($params{text}));
+        $params{text} =~ s/MAINWEB/$params{result}.='textchange';'USERSWEB'/ge if (defined($params{text}));
 
-    #TODO: apply conversions from TCP..
-
-    #rename user topics that contain 'TWiki'
-    if ( $topic =~ /^TWiki/ ) {
-        $topic =~ s/^TWiki/Wiki/g;
-        $result .= ', convert topic name from TWiki to Wiki';
-    }
-    my $oldtopics = '('
-      . join(
-        '|',
-        (
-            keys(
-                %{
-                    $Foswiki::cfg{Plugins}{TWikiCompatibilityPlugin}
-                      {TWikiWebTopicNameConversion}
-                  }
-            )
-        )
-      ) . ')';
-    $text =~ s/$oldtopics/replace('TWiki', $1, \$result)/gem;
-
-    $oldtopics = '('
-      . join(
-        '|',
-        (
-            keys(
-                %{
-                    $Foswiki::cfg{Plugins}{TWikiCompatibilityPlugin}
-                      {MainWebTopicNameConversion}
-                  }
-            )
-        )
-      ) . ')';
-    $text =~ s/$oldtopics/replace('Main', $1, \$result)/gem;
     
-    #special variables
-    $text =~ s/TWIKIWEB/$result.='textchange';'SYSTEMWEB'/ge;
-    $text =~ s/MAINWEB/$result.='textchange';'USERSWEB'/ge;
+    }
 
     #not sure how to pick Main and TWiki web names to convert..
 
-    return ( $result, $web, $topic, $text );
+    return %params;
 }
 
-sub replace {
+sub _TCP_replace {
     my $web       = shift;
     my $topic     = shift;
     my $resultRef = shift;

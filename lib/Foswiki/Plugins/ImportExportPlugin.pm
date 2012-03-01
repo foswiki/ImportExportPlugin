@@ -41,6 +41,8 @@ sub initPlugin {
         return 0;
     }
 
+    return 0 unless (Foswiki::Func::isAnAdmin());
+
     # Example code of how to get a preference value, register a macro
     # handler and register a RESTHandler (remove code you do not need)
 
