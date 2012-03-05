@@ -17,7 +17,7 @@ use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 
 our $VERSION = '$Rev$';
-our $RELEASE = '0.0.5';
+our $RELEASE = '0.0.6';
 our $SHORTDESCRIPTION = 'Import and export wiki data';
 our $NO_PREFS_IN_TOPIC = 1;
 

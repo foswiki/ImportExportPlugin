@@ -142,7 +142,7 @@ Will create a report in the Sandbox.ImportExportPluginCheckReport  __TODO: with 
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
-|  1.0.0 (20 Feb 2012: | Initial version |
+|  0.6 (5 Mar 2012: | Initial version |
 |  Home: | http://foswiki.org/Extensions/%TOPIC% |
 |  Support: | http://foswiki.org/Support/%TOPIC% |
 
