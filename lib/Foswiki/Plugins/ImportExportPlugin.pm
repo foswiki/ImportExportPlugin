@@ -17,7 +17,7 @@ use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 
 our $VERSION = '$Rev$';
-our $RELEASE = '0.0.6';
+our $RELEASE = '0.0.7';
 our $SHORTDESCRIPTION = 'Import and export wiki data';
 our $NO_PREFS_IN_TOPIC = 1;
 
@@ -175,7 +175,7 @@ sub doImport {
         #parameters to filters: skip(Delete*) or similar
         my $f = getFilterFunc($filter);
         if ( defined($f) ) {
-            print STDERR "adding filter\n";
+            print STDERR "adding filter : $filter\n";
             push( @filter_funcs, $f );
         }
     }
@@ -217,7 +217,7 @@ sub getFilterFunc {
     if ( defined($params) ) {
         my $originalFuncRef = $funcRef;
         $funcRef = sub { 
-            $originalFuncRef->( @_, $params ); 
+            $originalFuncRef->( @_, params=>$params ); 
         };
     }
     return $funcRef;
