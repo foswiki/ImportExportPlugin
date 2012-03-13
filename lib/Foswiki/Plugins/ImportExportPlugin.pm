@@ -17,7 +17,7 @@ use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 
 our $VERSION = '$Rev$';
-our $RELEASE = '0.0.7';
+our $RELEASE = '0.0.8';
 our $SHORTDESCRIPTION = 'Import and export wiki data';
 our $NO_PREFS_IN_TOPIC = 1;
 
@@ -41,7 +41,8 @@ sub initPlugin {
         return 0;
     }
 
-    return 0 unless (Foswiki::Func::isAnAdmin());
+    #plugin enabled, but it does nothing unless you are admin
+    return 1 unless (Foswiki::Func::isAnAdmin());
 
     # Example code of how to get a preference value, register a macro
     # handler and register a RESTHandler (remove code you do not need)

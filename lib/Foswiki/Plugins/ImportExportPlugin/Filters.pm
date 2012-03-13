@@ -418,6 +418,33 @@ sub _TCP_replace {
       { $web . 'WebTopicNameConversion' }{$topic};
 }
 
+
+=begin TML
+
+---++ ClassMethod converturls( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params ) -> ( result=>$params{result}, web=>$params{web}, topic=>$params{topic}, text=>$params{text}, attachment=>$file, params=>$params )
+
+   * converturls - convert literal URL's to topic links
+        * start with http(s?)://host/view/ and http(s?)://host/pub/
+        * can i add regex safely?
+        * then add SCRIPTURL/view
+        * think about pub, and other
+
+TODO: actually, this is hard, and given that we'll be dns directing all old host links to the new setup, we don't need it
+
+=cut
+
+sub converturls {
+    my %params = @_;
+
+    my @urls = split(/;\s*/, $params{params});
+    foreach my $url (@urls) {
+#        $params{text} =~ s/($url)(.*?)([])/convertUrl()/gem;
+    }
+    
+    return %params;
+}
+
+
 1;
 
 __END__
