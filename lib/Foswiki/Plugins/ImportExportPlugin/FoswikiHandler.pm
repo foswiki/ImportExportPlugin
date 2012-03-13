@@ -48,6 +48,7 @@ sub check {
     my @webs = split( /,\s*/, $webs );
 
     my %links;
+    my %crashes;
 
     foreach my $web (@webs) {
         print STDERR "$web \n";
@@ -64,37 +65,55 @@ sub check {
 #            next unless ( $count++ < 5 );
             my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
-            #filters can return 'skip', text or 'nochange'
-            my ( $result, $filteredweb, $filteredtopic, $filteredtext ) =
-              ( 'nochange', $web, $topic, $text );
-            foreach my $filter ( @{ $this->{filters} } ) {
-                my $linksListRef;
-                (
-                    $result,       $filteredweb, $filteredtopic,
-                    $filteredtext, $linksListRef
-                  )
-                  = $filter->(
-                    $result, $filteredweb, $filteredtopic, $filteredtext
-                  );
-                if ( defined($linksListRef) && ref($linksListRef) eq 'ARRAY' ) {
-                    map { push( @{ $links{$_} }, $web . '.' . $topic ); }
-                      @$linksListRef;
+                #filters can return 'skipweb','skip', text or 'nochange'
+                my %filterOutput = (
+				    result=>'nochange',
+				    web=>$web,
+				    topic=>$topic,
+				    type => 'topic',
+				    #filename => $files{$topic}{filename},
+				    text=>$text
+				    );
+                foreach my $filter ( @{ $this->{filters} } ) {
+                    %filterOutput =
+                      $filter->(%filterOutput);
+			         if ( $filterOutput{result} eq 'skipweb' ) {
+		                    #print STDERR "SKIPPING $filterOutput{web} web\n";
+		                    push(@output, "   * __SKIPPING__ $filterOutput{web} web");
+				            $web = '';
+                            last;
+                    }
+			         if ( $filterOutput{result} eq 'skip' ) {
+		                    #print STDERR "SKIPPING $filterOutput{web} , $filterOutput{topic}\n";
+		                    push(@output, "   * __SKIPPING__ $filterOutput{web} . $filterOutput{topic}");
+                            last;
+                    }
+		            if ( defined($filterOutput{links}) && ref($filterOutput{links}) eq 'ARRAY' ) {
+print STDERR "-- links: ".join(',', @{$filterOutput{links}})."\n";
+		                map { push( @{ $links{$_} }, $filterOutput{web} . '.' . $filterOutput{topic} ); }
+		                  @{$filterOutput{links}};
+		            }
                 }
-                goto SKIPTOPIC if ( $result eq 'skip' );
-            }
+		    next if ( $filterOutput{result} eq 'skip' );
+		    last if ( $filterOutput{result} eq 'skipweb' );
+		    if ( $filterOutput{result} eq 'crash' ) {
+                push(@output, "   1 [[$filterOutput{web}.$filterOutput{topic}][$filterOutput{web}, $filterOutput{topic}]]: %RED%__CRASHES__%ENDCOLOR% ");
+                $crashes{"$filterOutput{web}.$filterOutput{topic}"} = $filterOutput{crash};
+		        next;
+		    }
 
             #list of links for each topic
-            #push(@output, "   1 $filteredweb.$filteredtopic: $result");
+            push(@output, "   1 [[$filterOutput{web}.$filterOutput{topic}][$filterOutput{web}, $filterOutput{topic}]]: $filterOutput{result}");
 
-          SKIPTOPIC:
         }
     }
 
+    push (@output, '---++ Summary of broken links and where they are used');
     #list of links and how often they are used in that web
     my $linkCount = scalar(keys(%links));
     push( @output, map { '   1 '. $_ . ' : ' . join(' , ', @{$links{$_}}) } sort(keys(%links)) );
 
-    return join( "<br>\n", ( @output, "\n<hr>\nnumber of broken links: $linkCount\n<hr>\n" ) );
+    return join( "<br>\n", ( @output, "\n<hr>\nnumber of broken links: $linkCount\n<hr>\n", "\n<hr>\nnumber of crashed topics: ".scalar(keys(%crashes))."\n<hr>\n" ) );
 
 }
 

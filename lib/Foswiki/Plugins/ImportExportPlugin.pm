@@ -95,20 +95,8 @@ sub doCheck {
     $webs =~ s/,/;/g;
 
     $filterlist = 'selectwebs('.$webs.'), skiptopics(ImportExportPluginCheckReport), '.$filterlist;
-
-
-    my @filter_funcs;
-
-    foreach my $filter ( split( /,\s*/, $filterlist ) ) {
-
-        #parameters to filters: skip(Delete*) or similar
-        my $f = getFilterFunc($filter);
-        if ( defined($f) ) {
-            print STDERR "adding filter : $filter\n";
-            push( @filter_funcs, $f );
-        }
-    }
-
+    my @filter_funcs = getFilterFuncs($filterlist);
+    
     my $type = lc(
         Foswiki::Sandbox::untaintUnchecked(
             $query->{param}->{fromtype}[0] || 'FS'
@@ -168,17 +156,7 @@ sub doImport {
    
     $filterlist = 'selectwebs('.$webs.'), '.$filterlist;
 
-    my @filter_funcs;
-
-    foreach my $filter ( split( /,\s*/, $filterlist ) ) {
-        next if ($filter eq 'none');
-        #parameters to filters: skip(Delete*) or similar
-        my $f = getFilterFunc($filter);
-        if ( defined($f) ) {
-            print STDERR "adding filter : $filter\n";
-            push( @filter_funcs, $f );
-        }
-    }
+    my @filter_funcs = getFilterFuncs($filterlist);
 
     my $type = lc(
         Foswiki::Sandbox::untaintUnchecked(
@@ -194,6 +172,25 @@ sub doImport {
     Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginImportReport', $output);
     return $output;
 
+}
+
+sub getFilterFuncs {
+    my $filterlist = shift;
+    
+    my %filter_funcs;
+
+    foreach my $filter ( split( /,\s*/, $filterlist ) ) {
+
+        #parameters to filters: skip(Delete*) or similar
+        my ($f, $order) = getFilterFunc($filter);
+        if ( defined($f) ) {
+            print STDERR "adding filter : $filter ($order)\n";
+            $filter_funcs{$order} = $f;
+        } else {
+            print STDERR "SKIPPING filter : $filter\n";
+        }
+    }
+    return @filter_funcs{sort(keys(%filter_funcs))};
 }
 
 # filters are called with ($web, $topic, $text, $params) -> ($result, $web, $topic, $text)
@@ -212,15 +209,14 @@ sub getFilterFunc {
     die "can't load Filters" if $@;
 
     my $funcRef = $Foswiki::Plugins::ImportExportPlugin::Filters::switchboard{$filter};
-    die "---$filter---" unless (defined($funcRef));
-    return undef unless (defined($funcRef));
+    return (undef, undef) unless (defined($funcRef));
     if ( defined($params) ) {
         my $originalFuncRef = $funcRef;
         $funcRef = sub { 
             $originalFuncRef->( @_, params=>$params ); 
         };
     }
-    return $funcRef;
+    return ($funcRef,$Foswiki::Plugins::ImportExportPlugin::Filters::switchboard_order{$filter});
 }
 
 sub getFromHandler {

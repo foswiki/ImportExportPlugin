@@ -123,7 +123,7 @@ print STDERR "   2 $importFrom\n";
 			         if ( $filterOutput{result} eq 'skipweb' ) {
 		                    print STDERR "SKIPPING $filterOutput{web} web\n";
 		                    push(@output, "   * __SKIPPING__ $filterOutput{web} web");
-				    $web = '';
+				            $web = '';
                             last;
                     }
 			         if ( $filterOutput{result} eq 'skip' ) {

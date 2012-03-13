@@ -17,14 +17,18 @@ The data should then be able to transformed (for eg, twiki based topic links re-
 
 (re-implement using a FOREACH over a IMPORTFROMHANDLER macro), and extract UI's so that others can add new handlers in their own contribs
 
-
 %IF{
-    "context ImportExportPluginEnabled"
-    then="running"
-    else="You need to enable the ImportExportPlugin in configure"
+    "$USERNAME ingroup 'AdminGroup'"
+    else="This plugin on runs as admin"
+    then="%IF{
+            "context ImportExportPluginEnabled"
+            else="You need to enable the ImportExportPlugin in configure"
+            then="$dollarpercntINCLUDE{$dollarquot%SYSTEMWEB%.ImportExportPlugin$dollarquot section=$dollarquotapp$dollarquot}$dollarpercnt"
+        }%"
 }%
 
-
+<verbatim type=tml>
+%STARTSECTION{app}%
 %TABPANE% 
  %TAB{"FS"}% 
 <form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/import" method="post">
@@ -95,9 +99,9 @@ a way to copy one or more web's contents into one or more web
 <table width="100%" summary="%MAKETEXT{""}%">
 <input type="hidden" name="fromtype" value="foswiki" />
 <tr>
-Will create a report in the Sandbox.ImportExportPluginCheckReport  __TODO: with restricted ACL?__
+Will create a report in the Sandbox web ImportExportPluginCheckReport  __TODO: with restricted ACL?__
   <td align="right">
-   %MAKETEXT{"webs to preform checks on"}%
+   %MAKETEXT{"webs to perform checks on"}%
   </td><td>
    <select name="webs" class="foswikiSelect"> %WEBLIST{ "<option $marker>$name</option>" webs="webtemplate,public" selection="Sandbox" separator=" "}%</select>
   </td>
@@ -121,6 +125,8 @@ Will create a report in the Sandbox.ImportExportPluginCheckReport  __TODO: with 
 </form>
  %ENDTAB% 
 %ENDTABPANE% 
+%ENDSECTION{app}%
+</verbatim>
 ---++ pre-development thinking
 
    1 a set of ImportExportPlugin::From classes that implement =getListOfWebs=, =getListOfTopics=, =getListOfAttachments= and =getItem=
