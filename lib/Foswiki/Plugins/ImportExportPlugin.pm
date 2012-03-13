@@ -93,6 +93,9 @@ sub doCheck {
 	exit;
    }
 
+    my $output = "\n---++ ImportExportPlugin.check ".$webs."\n";
+    $output .= "./rest /ImportExportPlugin/check filterlist=$filterlist webs=$webs fromtype=foswiki\n";
+
     $webs =~ s/,/;/g;
 
     $filterlist = 'selectwebs('.$webs.'), skiptopics(ImportExportPluginCheck.*Report), '.$filterlist;
@@ -106,13 +109,12 @@ sub doCheck {
 
     my $handler = getFromHandler( $type, $query, \@filter_funcs );
 #TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
-    my $output = $handler->check();
+    $output .= $handler->check();
     $output .= "\n\n" . $handler->finish();
     $output .= "\n   * Set ALLOWTOPICVIEW=AdminGroup\n\n";
-    $webs =~ s/;//g;
 
-    $output .= '\n\nreport output to '.'Sandbox.ImportExportPluginCheck'.$webs.'Report'."\n\n";
-    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheck'.$webs.'Report', $output);
+    $output .= '\n\nreport output to '.'Sandbox.ImportExportPluginCheck'.Foswiki::Time::formatTime (time(), '$year$mo$day$hour$min').'Report'."\n\n";
+    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheck'.Foswiki::Time::formatTime (time(), '$year$mo$day$hour$min').'Report', $output);
     
     return $output;
 
@@ -152,12 +154,17 @@ sub doImport {
     my $webs =
       Foswiki::Sandbox::untaintUnchecked( $query->{param}->{webs}[0] );
     $webs =~ s/,/;/g;
+    my $fspath =
+      Foswiki::Sandbox::untaintUnchecked( $query->{param}->{fspath}[0] );
    
    if (!defined($webs)) {
 	#presume a vague demad for docco
 	print "./rest /ImportExportPlugin/import filterlist=twiki webs=Technology,Support fromtype=fs fspath=/home/sven/src/twiki_backup\n";
 	exit;
    }
+    my $output = "\n---++ ImportExportPlugin.import ".$webs."\n";
+    $output .= "./rest /ImportExportPlugin/import filterlist=$filterlist webs=$webs fromtype=fs fspath=$fspath\n";
+
    
     $filterlist = 'selectwebs('.$webs.'), '.$filterlist;
 
@@ -172,10 +179,14 @@ sub doImport {
     my $handler = getFromHandler( $type, $query, \@filter_funcs );
 
 #TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
-    my $output = $handler->import();
+    $output .= $handler->import();
     $output .= "\n\n" . $handler->finish();
     $output .= "\n   * Set ALLOWTOPICVIEW=AdminGroup\n\n";
-    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginImportReport', $output);
+    
+    $output .= '\n\nreport output to '.'Sandbox.ImportExportPluginImport'.Foswiki::Time::formatTime (time(), '$year$mo$day$hour$min').'Report'."\n\n";
+    Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginImport'.Foswiki::Time::formatTime (time(), '$year$mo$day$hour$min').'Report', $output);
+
+    
     return $output;
 
 }
