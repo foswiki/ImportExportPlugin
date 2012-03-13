@@ -139,8 +139,8 @@ sub chkLinks {
     #test for bad links in rendered html
     my $html;
     eval {
-        my $expandedTML = Foswiki::Func::expandCommonVariables( $params{text}, $params{topic}, $params{web} );
-        $html = Foswiki::Func::renderText( $expandedTML, $params{web}, $params{topic} );
+        $params{expanded_tml} = Foswiki::Func::expandCommonVariables( $params{text}, $params{topic}, $params{web} );
+        $params{expanded_html} = $html = Foswiki::Func::renderText( $params{expanded_tml}, $params{web}, $params{topic} );
     };
     if ($@) {
         $params{crash} = $@;
@@ -267,11 +267,10 @@ sub chkLinks {
 sub skiptopics {
     my %params = @_;
     
-    my @skiptopics = split(/;\s*/, $params{params});
-    if (grep(/$params{topic}/, @skiptopics)) {
-        $params{result} = 'skip';
-    }
-    
+    map {
+        $params{result} = 'skip' if ($params{topic} =~ /$_/);
+    } split(/;\s*/, $params{params});
+
     return %params;
 }
 

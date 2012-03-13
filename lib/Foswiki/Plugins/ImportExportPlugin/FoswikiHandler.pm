@@ -49,6 +49,8 @@ sub check {
 
     my %links;
     my %crashes;
+    my %topiccount;
+    my $brokenlink_topiccount;
 
     foreach my $web (@webs) {
         print STDERR "$web \n";
@@ -62,6 +64,7 @@ sub check {
         my $count;
         while ( $topicItr->hasNext() ) {
             my $topic = $topicItr->next();
+            $topiccount{$web}++;
 #            next unless ( $count++ < 5 );
             my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
@@ -103,7 +106,10 @@ print STDERR "-- links: ".join(',', @{$filterOutput{links}})."\n";
 		    }
 
             #list of links for each topic
-            push(@output, "   1 [[$filterOutput{web}.$filterOutput{topic}][$filterOutput{web}, $filterOutput{topic}]]: $filterOutput{result}");
+            if ($filterOutput{result} ne 'nochange') {
+                push(@output, "   1 [[$filterOutput{web}.$filterOutput{topic}][$filterOutput{web}, $filterOutput{topic}]]: $filterOutput{result}");
+                $brokenlink_topiccount++;
+            }
 
         }
     }
@@ -112,8 +118,23 @@ print STDERR "-- links: ".join(',', @{$filterOutput{links}})."\n";
     #list of links and how often they are used in that web
     my $linkCount = scalar(keys(%links));
     push( @output, map { '   1 '. $_ . ' : ' . join(' , ', @{$links{$_}}) } sort(keys(%links)) );
+    
+    
+    ####summary
+    push(@output, "\n<hr>\n");
+    push(@output, "number of broken links: $linkCount\n");
+    push(@output, "number of crashed topics: ".scalar(keys(%crashes)."\n"));
+    push(@output, "number of topics with broken links : $brokenlink_topiccount\n");
+    my $totaltopics = 0;
+    push(@output, map{$totaltopics +=$topiccount{$_};"topics in $_: ".$topiccount{$_}."\n"} keys(%topiccount));
+    push(@output, "number of topics checked: $totaltopics\n");
+    push(@output, "\n");
+    push(@output, "\n");
+    push(@output, "\n");
+    push(@output, "\n<hr>\n");
 
-    return join( "<br>\n", ( @output, "\n<hr>\nnumber of broken links: $linkCount\n<hr>\n", "\n<hr>\nnumber of crashed topics: ".scalar(keys(%crashes))."\n<hr>\n" ) );
+
+    return join( "<br>\n", ( @output,  ) );
 
 }
 

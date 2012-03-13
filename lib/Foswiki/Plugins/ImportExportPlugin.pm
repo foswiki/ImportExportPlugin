@@ -95,7 +95,7 @@ sub doCheck {
 
     $webs =~ s/,/;/g;
 
-    $filterlist = 'selectwebs('.$webs.'), skiptopics(ImportExportPluginCheckReport), '.$filterlist;
+    $filterlist = 'selectwebs('.$webs.'), skiptopics(ImportExportPluginCheck.*Report), '.$filterlist;
     my @filter_funcs = getFilterFuncs($filterlist);
     
     my $type = lc(
@@ -109,8 +109,11 @@ sub doCheck {
     my $output = $handler->check();
     $output .= "\n\n" . $handler->finish();
     $output .= "\n   * Set ALLOWTOPICVIEW=AdminGroup\n\n";
-    $webs =~ s/;/-/g;
+    $webs =~ s/;//g;
+
+    $output .= '\n\nreport output to '.'Sandbox.ImportExportPluginCheck'.$webs.'Report'."\n\n";
     Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheck'.$webs.'Report', $output);
+    
     return $output;
 
 }

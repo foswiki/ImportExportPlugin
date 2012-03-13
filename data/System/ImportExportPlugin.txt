@@ -19,16 +19,60 @@ The data should then be able to transformed (for eg, twiki based topic links re-
 
 %IF{
     "$USERNAME ingroup 'AdminGroup'"
-    else="This plugin on runs as admin"
+    else="Sorry, you can only import if you are in the AdminGroup (or sudo to it)"
     then="%IF{
             "context ImportExportPluginEnabled"
             else="You need to enable the ImportExportPlugin in configure"
-            then="$dollarpercntINCLUDE{$dollarquot%SYSTEMWEB%.ImportExportPlugin$dollarquot section=$dollarquotapp$dollarquot}$dollarpercnt"
+            then="$dollarpercntINCLUDE{$dollarquot%SYSTEMWEB%.ImportExportPlugin$dollarquot section=$dollarquotimport-app$dollarquot}$dollarpercnt"
         }%"
 }%
 
+---++ Check topics in this foswiki
+
+This checker was initially written to find links to missing topics or attachments (and to list external url's in case they could cause issues.
+
+In the process of rendering, It also lists all topics that cause a crash, so can help you debug issues caused by plugins.
+
+It will also report what MACRO's were not expanded, thus alerting you to potentially missing plugins.
+
+%IF{
+    "$USERNAME ingroup 'AdminGroup'"
+    else="Sorry, you can only check content if you are in the AdminGroup (or sudo to it)"
+    then="%IF{
+            "context ImportExportPluginEnabled"
+            else="You need to enable the ImportExportPlugin in configure"
+            then="$dollarpercntINCLUDE{$dollarquot%SYSTEMWEB%.ImportExportPlugin$dollarquot section=$dollarquotcheck-app$dollarquot}$dollarpercnt"
+        }%"
+}%
+
+---++ pre-development thinking
+
+   1 a set of ImportExportPlugin::From classes that implement =getListOfWebs=, =getListOfTopics=, =getListOfAttachments= and =getItem=
+   2 have a UI that allows the user to select the From class and add parameters to it
+      * From::FS and From::SSH would require permissions (somehow), whereas From::Zip or From::Http might work differently
+   3 given a From handler, the user can select a 'set' of items that are available (from a UI) and a destination, and hit 'go'
+   4 a set of ImportExportPlugin::Transforms can be selected to be used while importing a set (none, twiki->foswiki, cvs->forms topics, funny encoding->utf8, change topic name)
+
+
+
+---++ Installation
+%$INSTALL_INSTRUCTIONS%
+
+---++ Info
+
+|  Author: | Foswiki:Main.SvenDowideit |
+|  Copyright: | &copy; 2011, SvenDowideit@fosiki.com |
+|  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
+|  Release: | %$RELEASE% |
+|  Version: | %$VERSION% |
+|  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
+|  0.6 (5 Mar 2012: | Initial version |
+|  Home: | http://foswiki.org/Extensions/%TOPIC% |
+|  Support: | http://foswiki.org/Support/%TOPIC% |
+
+
 <verbatim type=tml>
-%STARTSECTION{app}%
+%STARTSECTION{import-app}%
 %TABPANE% 
  %TAB{"FS"}% 
 <form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/import" method="post">
@@ -90,9 +134,9 @@ enter ssh path to FS? (or is this?)
 a way to copy one or more web's contents into one or more web
  %ENDTAB% 
 %ENDTABPANE% 
-
----++ Check / fix items in this foswiki
-
+%ENDSECTION{import-app}%
+----------------------
+%STARTSECTION{check-app}%
 %TABPANE% 
  %TAB{"Foswiki"}% 
 <form name="main" enctype="multipart/form-data" action="%SCRIPTURLPATH{"rest"}%/ImportExportPlugin/check" method="post">
@@ -125,30 +169,6 @@ Will create a report in the Sandbox web ImportExportPluginCheckReport  __TODO: w
 </form>
  %ENDTAB% 
 %ENDTABPANE% 
-%ENDSECTION{app}%
+%ENDSECTION{check-app}%
 </verbatim>
----++ pre-development thinking
-
-   1 a set of ImportExportPlugin::From classes that implement =getListOfWebs=, =getListOfTopics=, =getListOfAttachments= and =getItem=
-   2 have a UI that allows the user to select the From class and add parameters to it
-      * From::FS and From::SSH would require permissions (somehow), whereas From::Zip or From::Http might work differently
-   3 given a From handler, the user can select a 'set' of items that are available (from a UI) and a destination, and hit 'go'
-   4 a set of ImportExportPlugin::Transforms can be selected to be used while importing a set (none, twiki->foswiki, cvs->forms topics, funny encoding->utf8, change topic name)
-
-
-
----++ Installation
-%$INSTALL_INSTRUCTIONS%
-
----++ Info
-
-|  Author: | Foswiki:Main.SvenDowideit |
-|  Copyright: | &copy; 2011, SvenDowideit@fosiki.com |
-|  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
-|  Release: | %$RELEASE% |
-|  Version: | %$VERSION% |
-|  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
-|  0.6 (5 Mar 2012: | Initial version |
-|  Home: | http://foswiki.org/Extensions/%TOPIC% |
-|  Support: | http://foswiki.org/Support/%TOPIC% |
 
