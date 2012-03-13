@@ -107,6 +107,7 @@ sub doCheck {
 #TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
     my $output = $handler->check();
     $output .= "\n\n" . $handler->finish();
+    $output .= "\n   * Set ALLOWTOPICVIEW=AdminGroup\n\n";
     $webs =~ s/;/-/g;
     Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginCheck'.$webs.'Report', $output);
     return $output;
@@ -169,6 +170,7 @@ sub doImport {
 #TODO: this will eventually be a multi-phase thing - show list of candidates to import, then doit
     my $output = $handler->import();
     $output .= "\n\n" . $handler->finish();
+    $output .= "\n   * Set ALLOWTOPICVIEW=AdminGroup\n\n";
     Foswiki::Func::saveTopicText('Sandbox', 'ImportExportPluginImportReport', $output);
     return $output;
 
