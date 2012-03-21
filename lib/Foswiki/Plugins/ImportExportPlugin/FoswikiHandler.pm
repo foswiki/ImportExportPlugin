@@ -50,7 +50,7 @@ sub check {
     my %links;
     my %crashes;
     my %topiccount;
-    my $brokenlink_topiccount;
+    my $brokenlink_topiccount = 0;
 
     foreach my $web (@webs) {
         print STDERR "$web \n";

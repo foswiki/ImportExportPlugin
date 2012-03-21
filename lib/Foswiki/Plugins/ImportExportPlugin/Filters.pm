@@ -183,11 +183,14 @@ sub chkLinks {
         my $restBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'rest');
         my $viewBase = Foswiki::Func::getScriptUrl(undef, undef, 'view');
         my $viewBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'view');
+        if ($viewBasePath =~ /^https?:\/\/(.*?)\/(.*)$/) {
+	    $viewBasePath = $2;
+        }
         my $editBase = Foswiki::Func::getScriptUrl(undef, undef, 'edit');
         my $editBasePath = Foswiki::Func::getScriptUrlPath(undef, undef, 'edit');
         my $scriptBase = Foswiki::Func::getScriptUrl(undef, undef);
         my $scriptBasePath = Foswiki::Func::getScriptUrlPath(undef, undef);
-        if ($scriptBasePath =~ /^http:\/\/(.*?)\/(.*)$/) {
+        if ($scriptBasePath =~ /^https?:\/\/(.*?)\/(.*)$/) {
 	    $scriptBasePath = $2;
         }
         #TODO: validate that bin URL's are to scripts that exist? this might be dangerous wrt apache rewrites
@@ -210,11 +213,12 @@ sub chkLinks {
                 } elsif ($link =~ /($restBase|$restBasePath)/) {
                     #the text rendering is using this rest handler as the basurl for tableedit and stuff.
                     $testedLinkCache{$link} = 'rest';    #fake it being OK
-                } elsif (($link =~ /^http/i) && !($link =~ /^$urlHost/i)) {
+                } elsif (($link =~ /^https?/i) && !($link =~ /^$urlHost/i)) {
                         #try to ignore url's that are not ours
     #TODO: this is dangerous, as we'll be ignoring url's from which the wiki data came
     #TODO: create list and report on external links separatly - optionally follow the link!
                         $testedLinkCache{$link} = 'EXTERNAL LINK';    #fake it being OK
+#print STDERR "EXTERNAL LINK: $link\n";
                 } else {
                     my $webtopic = $link;
                     $webtopic =~ s/[\#\?].*$//;
@@ -238,6 +242,14 @@ sub chkLinks {
                         if (-e $pubDir.$1) {
                             $testedLinkCache{$link} = 'attachment exists';
                         }
+                    } elsif ($webtopic =~ /($viewBase|$viewBasePath)(.*)$/) {
+			#ShorterUrl setup?
+                        my ($w, $t) = Foswiki::Func::normalizeWebTopicName('', $2);
+                        $testedLinkCache{$link} = Foswiki::Func::topicExists($w, $t);
+                        $testedLinkCache{$link} = 'rest' if ($params{web} eq 'ImportExportPlugin'  || $params{topic} eq 'check' || $params{topic} eq 'Check');
+                        $testedLinkCache{$link} = 'rest' if ($w eq 'ImportExportPlugin'  || $t eq 'check' || $t eq 'Check');
+                    } else {
+#detection fail
                     }
                 }
             }
